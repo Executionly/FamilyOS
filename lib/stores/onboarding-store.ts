@@ -9,15 +9,15 @@ interface OnboardingState {
   familyName: string;
   members: Array<{
     name: string;
-    role: 'admin' | 'coparent' | 'member' | 'child';
-    age_band?: 'toddler' | 'child' | 'preteen' | 'teen' | 'adult';
+    role: 'admin' | 'coparent' | 'member' | 'child' | string;
+    age_band?: 'toddler' | 'child' | 'preteen' | 'teen' | 'adult' | string;
   }>;
   coparentEmail?: string;
   isCompleted: boolean;
 
   // Actions
   setFamilyName: (name: string) => void;
-  addMember: (member: { name: string; role: 'admin' | 'coparent' | 'member' | 'child'; age_band?: 'toddler' | 'child' | 'preteen' | 'teen' | 'adult' }) => void;
+  addMember: (member: { name: string; role: 'admin' | 'coparent' | 'member' | 'child' | string; age_band?: 'toddler' | 'child' | 'preteen' | 'teen' | 'adult' | string }) => void;
   removeMember: (index: number) => void;
   setCoparentEmail: (email: string) => void;
   goToStep: (step: OnboardingStep) => void;

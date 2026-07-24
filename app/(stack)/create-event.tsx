@@ -1,0 +1,248 @@
+import { ScrollView, Text, View, Pressable, TextInput, ActivityIndicator } from 'react-native';
+import { useRouter } from 'expo-router';
+import { useState } from 'react';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { ScreenContainer } from '@/components/screen-container';
+import { useColors } from '@/hooks/use-colors';
+import { useFamilyStore } from '@/lib/stores/family-store';
+import { useCalendarStore } from '@/lib/stores/calendar-store';
+import { AppHeader } from '@/components/app-header';
+
+const COLORS = ['#F59E0B', '#3B82F6', '#10B981', '#EF4444', '#8B5CF6', '#EC4899'];
+
+export default function CreateEventScreen() {
+  const router = useRouter();
+  const colors = useColors();
+  const { family } = useFamilyStore();
+  const { createEvent, loading } = useCalendarStore();
+
+  const [title, setTitle] = useState('');
+  const [startDate, setStartDate] = useState(new Date());
+  const [endDate, setEndDate] = useState(new Date(Date.now() + 3600000)); // 1 hour later
+  const [location, setLocation] = useState('');
+  const [selectedColor, setSelectedColor] = useState(COLORS[0]);
+  const [recurrence, setRecurrence] = useState<'none' | 'daily' | 'weekly' | 'monthly' | 'yearly'>('none');
+  const [showStartDatePicker, setShowStartDatePicker] = useState(false);
+  const [showStartTimePicker, setShowStartTimePicker] = useState(false);
+  const [showEndDatePicker, setShowEndDatePicker] = useState(false);
+  const [showEndTimePicker, setShowEndTimePicker] = useState(false);
+
+  const handleStartDateChange = (event: any, date?: Date) => {
+    if (date) setStartDate(date);
+    setShowStartDatePicker(false);
+  };
+
+  const handleStartTimeChange = (event: any, date?: Date) => {
+    if (date) setStartDate(date);
+    setShowStartTimePicker(false);
+  };
+
+  const handleEndDateChange = (event: any, date?: Date) => {
+    if (date) setEndDate(date);
+    setShowEndDatePicker(false);
+  };
+
+  const handleEndTimeChange = (event: any, date?: Date) => {
+    if (date) setEndDate(date);
+    setShowEndTimePicker(false);
+  };
+
+  const handleCreate = async () => {
+    if (!title?.trim() || !family?.id) {
+      alert('Please enter an event title');
+      return;
+    }
+
+    try {
+      await createEvent(family.id, family.created_by, {
+        title,
+        start_date: startDate.toISOString(),
+        end_date: endDate.toISOString(),
+        location: location || undefined,
+        color: selectedColor,
+        recurrence,
+      });
+
+      router.back();
+    } catch (error) {
+      console.error('Error creating event:', error);
+      alert('Failed to create event');
+    }
+  };
+
+  return (
+    <ScreenContainer containerClassName="bg-background" safeAreaClassName="bg-background">
+      <AppHeader title="Create Event" showBack />
+      <ScrollView contentContainerStyle={{ flexGrow: 1 }} showsVerticalScrollIndicator={false}>
+        <View className="flex-1 px-6 pb-8">
+
+          {/* Title */}
+          <View className="mb-6">
+            <Text className="text-sm font-semibold text-foreground mb-2">Title *</Text>
+            <TextInput
+              placeholder="Event title"
+              value={title}
+              onChangeText={setTitle}
+              placeholderTextColor={colors.muted}
+              className="px-4 py-3 rounded-lg border border-border text-foreground"
+              style={{ borderColor: colors.border, color: colors.foreground }}
+            />
+          </View>
+
+          {/* Start Date & Time */}
+          <View className="mb-6">
+            <Text className="text-sm font-semibold text-foreground mb-2">Start Date & Time</Text>
+            <View className="flex-row gap-2">
+              <Pressable
+                onPress={() => setShowStartDatePicker(true)}
+                className="flex-1 px-4 py-3 rounded-lg border border-border"
+                style={{ borderColor: colors.border, backgroundColor: colors.surface }}
+              >
+                <Text className="text-foreground text-xs">
+                  {startDate.toLocaleDateString()}
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => setShowStartTimePicker(true)}
+                className="flex-1 px-4 py-3 rounded-lg border border-border"
+                style={{ borderColor: colors.border, backgroundColor: colors.surface }}
+              >
+                <Text className="text-foreground text-xs">
+                  {startDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                </Text>
+              </Pressable>
+            </View>
+            {showStartDatePicker && (
+              <DateTimePicker
+                value={startDate}
+                mode="date"
+                display="default"
+                onChange={handleStartDateChange}
+              />
+            )}
+            {showStartTimePicker && (
+              <DateTimePicker
+                value={startDate}
+                mode="time"
+                display="default"
+                onChange={handleStartTimeChange}
+              />
+            )}
+          </View>
+
+          {/* End Date & Time */}
+          <View className="mb-6">
+            <Text className="text-sm font-semibold text-foreground mb-2">End Date & Time</Text>
+            <View className="flex-row gap-2">
+              <Pressable
+                onPress={() => setShowEndDatePicker(true)}
+                className="flex-1 px-4 py-3 rounded-lg border border-border"
+                style={{ borderColor: colors.border, backgroundColor: colors.surface }}
+              >
+                <Text className="text-foreground text-xs">
+                  {endDate.toLocaleDateString()}
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => setShowEndTimePicker(true)}
+                className="flex-1 px-4 py-3 rounded-lg border border-border"
+                style={{ borderColor: colors.border, backgroundColor: colors.surface }}
+              >
+                <Text className="text-foreground text-xs">
+                  {endDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                </Text>
+              </Pressable>
+            </View>
+            {showEndDatePicker && (
+              <DateTimePicker
+                value={endDate}
+                mode="date"
+                display="default"
+                onChange={handleEndDateChange}
+              />
+            )}
+            {showEndTimePicker && (
+              <DateTimePicker
+                value={endDate}
+                mode="time"
+                display="default"
+                onChange={handleEndTimeChange}
+              />
+            )}
+          </View>
+
+          {/* Location */}
+          <View className="mb-6">
+            <Text className="text-sm font-semibold text-foreground mb-2">Location</Text>
+            <TextInput
+              placeholder="Event location"
+              value={location}
+              onChangeText={setLocation}
+              placeholderTextColor={colors.muted}
+              className="px-4 py-3 rounded-lg border border-border text-foreground"
+              style={{ borderColor: colors.border, color: colors.foreground }}
+            />
+          </View>
+
+          {/* Color */}
+          <View className="mb-6">
+            <Text className="text-sm font-semibold text-foreground mb-3">Color</Text>
+            <View className="flex-row gap-2 flex-wrap">
+              {COLORS.map((color) => (
+                <Pressable
+                  key={color}
+                  onPress={() => setSelectedColor(color)}
+                  className={`w-12 h-12 rounded-full border-2 ${
+                    selectedColor === color ? 'border-foreground' : 'border-transparent'
+                  }`}
+                  style={{ backgroundColor: color }}
+                />
+              ))}
+            </View>
+          </View>
+
+          {/* Recurrence */}
+          <View className="mb-8">
+            <Text className="text-sm font-semibold text-foreground mb-3">Recurrence</Text>
+            <View className="flex-row gap-2 flex-wrap">
+              {(['none', 'daily', 'weekly', 'monthly', 'yearly'] as const).map((r) => (
+                <Pressable
+                  key={r}
+                  onPress={() => setRecurrence(r)}
+                  className={`px-3 py-2 rounded-lg border ${
+                    recurrence === r ? 'border-primary' : 'border-border'
+                  }`}
+                  style={{
+                    backgroundColor: recurrence === r ? colors.primary : colors.surface,
+                  }}
+                >
+                  <Text
+                    className={`text-xs font-semibold capitalize ${
+                      recurrence === r ? 'text-white' : 'text-foreground'
+                    }`}
+                  >
+                    {r}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+
+          {/* Create Button */}
+          <Pressable
+            onPress={handleCreate}
+            disabled={loading}
+            className="py-4 rounded-lg items-center"
+            style={{ backgroundColor: colors.primary, opacity: loading ? 0.6 : 1 }}
+          >
+            {loading ? (
+              <ActivityIndicator color="white" />
+            ) : (
+              <Text className="text-white font-semibold text-lg">Create Event</Text>
+            )}
+          </Pressable>
+        </View>
+      </ScrollView>
+    </ScreenContainer>
+  );
+}

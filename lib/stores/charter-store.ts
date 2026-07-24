@@ -68,10 +68,10 @@ export const useCharterStore = create<CharterState>((set, get) => ({
       }
 
       set({ charter: data || null, error: null });
-      set({draftConstitution: data.constitution})
-      set({draftMission: data.mission})
-      set({draftVision: data.vision})
-      set({draftValues: data.values})
+      set({draftConstitution: data?.constitution})
+      set({draftMission: data?.mission})
+      set({draftVision: data?.vision})
+      set({draftValues: data?.values})
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to fetch charter';
       set({ error: message });
@@ -148,7 +148,7 @@ export const useCharterStore = create<CharterState>((set, get) => ({
 
   addValue: (value: string) => {
     set((state) => ({
-      draftValues: [...state.draftValues, value],
+      draftValues: [...(state.draftValues ?? []), value],
     }));
   },
 

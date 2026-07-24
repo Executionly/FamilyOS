@@ -33,7 +33,7 @@ export default function CharterPreviewScreen() {
       });
 
       clearDrafts();
-      router.replace('/(tabs)');
+      router.replace('/(tabs)/foundation');
     } catch (err) {
       console.log('Error saving charter:', err);
       const message = err instanceof Error ? err.message : 'Failed to save charter';
@@ -67,8 +67,7 @@ ${draftConstitution}`;
       console.error('Error sharing:', err);
     }
   };
-console.log('Draft Mission:', draftVision, 'Draft Vision:', draftVision, 'Draft Values:', draftValues, 'Draft Constitution:', draftConstitution);
-console.log('Charter:', charter);
+
   return (
     <ScreenContainer containerClassName="bg-background" safeAreaClassName="bg-background">
       <ScrollView
@@ -87,7 +86,7 @@ console.log('Charter:', charter);
 
           {/* Error Message */}
           {error && (
-            <View className="mb-6 p-4 bg-error/10 rounded-lg border border-error/20">
+            <View className="mb-6 p-4 bg-error/10 rounded-lg">
               <Text className="text-sm text-error font-medium">{error}</Text>
             </View>
           )}
@@ -95,20 +94,20 @@ console.log('Charter:', charter);
           {/* Mission Section */}
           <View className="mb-6 bg-surface rounded-lg p-4 border border-border">
             <Text className="text-sm font-semibold text-primary mb-2">MISSION</Text>
-            <Text className="text-base text-foreground leading-relaxed">{charter?.mission}</Text>
+            <Text className="text-base text-foreground leading-relaxed">{draftMission ? draftMission : charter?.mission}</Text>
           </View>
 
           {/* Vision Section */}
           <View className="mb-6 bg-surface rounded-lg p-4 border border-border">
             <Text className="text-sm font-semibold text-primary mb-2">VISION</Text>
-            <Text className="text-base text-foreground leading-relaxed">{charter?.vision}</Text>
+            <Text className="text-base text-foreground leading-relaxed">{draftVision ? draftVision : charter?.vision}</Text>
           </View>
 
           {/* Values Section */}
           <View className="mb-6 bg-surface rounded-lg p-4 border border-border">
             <Text className="text-sm font-semibold text-primary mb-3">CORE VALUES</Text>
             <View className="flex-row flex-wrap gap-2">
-              {charter?.values?.map((value, index) => (
+              {(draftValues?.length > 0 ? draftValues : charter?.values)?.map((value, index) => (
                 <View
                   key={index}
                   style={{ backgroundColor: colors.primary }}
@@ -123,7 +122,7 @@ console.log('Charter:', charter);
           {/* Constitution Section */}
           <View className="mb-6 bg-surface rounded-lg p-4 border border-border">
             <Text className="text-sm font-semibold text-primary mb-2">CONSTITUTION</Text>
-            <Text className="text-base text-foreground leading-relaxed">{charter?.constitution}</Text>
+            <Text className="text-base text-foreground leading-relaxed">{draftConstitution ?? charter?.constitution}</Text>
           </View>
 
           {/* Action Buttons */}

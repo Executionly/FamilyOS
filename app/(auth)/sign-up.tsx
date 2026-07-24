@@ -148,15 +148,14 @@ export default function SignUpScreen() {
           </TouchableOpacity>
 
           {/* Divider */}
-          <View className="flex-row items-center mb-6">
+          {/* <View className="flex-row items-center mb-6">
             <View className="flex-1 h-px bg-border" />
             <Text className="mx-3 text-sm text-muted">Or sign up with</Text>
             <View className="flex-1 h-px bg-border" />
-          </View>
+          </View> */}
 
           {/* OAuth Buttons */}
-          <View className="gap-3 mb-6">
-            {/* Apple Sign-In */}
+          {/* <View className="gap-3 mb-6">
             <Pressable
               disabled={loading}
               style={({ pressed }) => [
@@ -168,7 +167,6 @@ export default function SignUpScreen() {
               <Text className="text-base font-semibold text-foreground">🍎 Sign up with Apple</Text>
             </Pressable>
 
-            {/* Google Sign-In */}
             <Pressable
               disabled={loading}
               style={({ pressed }) => [
@@ -179,7 +177,7 @@ export default function SignUpScreen() {
             >
               <Text className="text-base font-semibold text-foreground">🔵 Sign up with Google</Text>
             </Pressable>
-          </View>
+          </View> */}
 
           {/* Sign In Link */}
           <View className="flex-row justify-center items-center">

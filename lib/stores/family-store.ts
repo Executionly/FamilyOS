@@ -1,8 +1,8 @@
 import { create } from 'zustand';
 import { supabase } from '@/lib/_core/supabase';
 
-export type MemberRole = 'admin' | 'coparent' | 'member' | 'child';
-export type AgeBand = 'toddler' | 'child' | 'preteen' | 'teen' | 'adult';
+export type MemberRole = 'admin' | 'coparent' | 'member' | 'child' | string;
+export type AgeBand = 'toddler' | 'child' | 'preteen' | 'teen' | 'adult' | string;
 
 export interface Member {
   id: string;

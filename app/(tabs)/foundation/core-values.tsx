@@ -1,50 +1,53 @@
 import { useState } from 'react';
-import { ScrollView, Text, View, TextInput, Pressable, ActivityIndicator, FlatList } from 'react-native';
+import { ScrollView, Text, View, TextInput, Pressable, ActivityIndicator, FlatList, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ScreenContainer } from '@/components/screen-container';
 import { useCharterStore } from '@/lib/stores/charter-store';
 import { useColors } from '@/hooks/use-colors';
+import { generateFamilyValues } from '@/lib/services/charter-ai';
+import { useFamilyStore } from '@/lib/stores/family-store';
 
 export default function CoreValuesScreen() {
   const router = useRouter();
   const colors = useColors();
-  const { draftValues, addValue, removeValue, aiSuggestions, setAISuggestions } = useCharterStore();
+  const { charter, draftValues, addValue, removeValue, aiSuggestions, setAISuggestions } = useCharterStore();
   const [valueInput, setValueInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { family } = useFamilyStore();
 
   const handleAddValue = () => {
-    if (!valueInput.trim()) {
+    if (!valueInput?.trim()) {
       setError('Please enter a value');
       return;
     }
-    if (draftValues.length >= 10) {
+    if (draftValues?.length >= 10) {
       setError('Maximum 10 values allowed');
       return;
     }
-    addValue(valueInput.trim());
+    addValue(valueInput?.trim());
     setValueInput('');
     setError(null);
   };
 
   const handleGenerateAISuggestions = async () => {
-    setError(null);
-    setLoading(true);
-    try {
-      // TODO: Call Supabase Edge Function to generate AI suggestions
-      // For now, show placeholder suggestions
-      setAISuggestions({
-        values: ['Love', 'Honesty', 'Growth', 'Respect', 'Fun'],
-      });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to generate suggestions');
-    } finally {
-      setLoading(false);
-    }
-  };
+  setError(null);
+  setLoading(true);
+  try {
+    const result = await generateFamilyValues(family?.name || 'Our Family', {
+      currentValues: draftValues,
+      mission: charter?.mission,
+    });
+    setAISuggestions({ values: result.values });
+  } catch (err) {
+    setError(err instanceof Error ? err.message : 'Failed to generate suggestions');
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleContinue = () => {
-    if (draftValues.length === 0) {
+    if (draftValues?.length === 0) {
       setError('Please add at least one core value');
       return;
     }
@@ -69,7 +72,7 @@ export default function CoreValuesScreen() {
 
           {/* Error Message */}
           {error && (
-            <View className="mb-6 p-4 bg-error/10 rounded-lg border border-error/20">
+            <View className="mb-6 p-4 bg-error/10 rounded-lg">
               <Text className="text-sm text-error font-medium">{error}</Text>
             </View>
           )}
@@ -101,7 +104,7 @@ export default function CoreValuesScreen() {
           </View>
 
           {/* Values List */}
-          {draftValues.length > 0 && (
+          {draftValues?.length > 0 && (
             <View className="mb-6">
               <Text className="text-sm font-semibold text-foreground mb-3">Your Values</Text>
               <FlatList
@@ -120,38 +123,39 @@ export default function CoreValuesScreen() {
                   </View>
                 )}
               />
-              <Text className="text-xs text-muted mt-2">{draftValues.length}/10 values</Text>
+              <Text className="text-xs text-muted mt-2">{draftValues?.length}/10 values</Text>
             </View>
           )}
 
           {/* AI Suggestions */}
-          {aiSuggestions.values && aiSuggestions.values.length > 0 && (
+          {aiSuggestions?.values && aiSuggestions?.values?.length > 0 && (
             <View className="mb-6 bg-primary/10 rounded-lg p-4 border border-primary/20">
               <Text className="text-sm font-semibold text-foreground mb-3">✨ AI Suggestions</Text>
               <View className="flex-row flex-wrap gap-2">
-                {aiSuggestions.values.map((value, index) => (
-                  <Pressable
+                {aiSuggestions?.values.map((value, index) => (
+                  <TouchableOpacity
                     key={index}
                     onPress={() => {
-                      if (!draftValues.includes(value)) {
+                      if (!draftValues?.includes(value)) {
                         addValue(value);
                       }
                     }}
+                    activeOpacity={0.7}
                     style={{
-                      backgroundColor: draftValues.includes(value) ? colors.primary : colors.surface,
+                      backgroundColor: draftValues?.includes(value) ? colors.primary : colors.surface,
                       borderColor: colors.border,
                     }}
                     className="border rounded-full px-3 py-2"
                   >
                     <Text
                       style={{
-                        color: draftValues.includes(value) ? colors.background : colors.foreground,
+                        color: draftValues?.includes(value) ? colors.background : colors.foreground,
                       }}
                       className="text-sm font-semibold"
                     >
                       {value}
                     </Text>
-                  </Pressable>
+                  </TouchableOpacity>
                 ))}
               </View>
             </View>

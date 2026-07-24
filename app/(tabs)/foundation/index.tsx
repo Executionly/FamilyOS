@@ -12,7 +12,7 @@ export default function FoundationBuilderScreen() {
   const { charter, fetchCharter, loading: charterLoading } = useCharterStore();
   const { family } = useFamilyStore();
   const [loading, setLoading] = useState(true);
-console.log('FoundationBuilderScreen: family:', family);
+
   useEffect(() => {
     const loadCharter = async () => {
       if (family) {
@@ -49,7 +49,7 @@ console.log('FoundationBuilderScreen: family:', family);
       </ScreenContainer>
     );
   }
-console.log("charter",charter)
+
   return (
     <ScreenContainer containerClassName="bg-background" safeAreaClassName="bg-background">
       <ScrollView

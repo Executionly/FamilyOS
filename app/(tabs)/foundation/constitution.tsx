@@ -4,34 +4,27 @@ import { useRouter } from 'expo-router';
 import { ScreenContainer } from '@/components/screen-container';
 import { useCharterStore } from '@/lib/stores/charter-store';
 import { useColors } from '@/hooks/use-colors';
+import { generateConstitution } from '@/lib/services/charter-ai';
+import { useFamilyStore } from '@/lib/stores/family-store';
 
 export default function ConstitutionScreen() {
   const router = useRouter();
   const colors = useColors();
-  const { draftConstitution, setDraftConstitution, aiSuggestions, setAISuggestions } = useCharterStore();
+  const { charter, draftValues, draftConstitution, setDraftConstitution, aiSuggestions, setAISuggestions } = useCharterStore();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { family } = useFamilyStore();
 
   const handleGenerateAISuggestions = async () => {
     setError(null);
     setLoading(true);
     try {
-      // TODO: Call Supabase Edge Function to generate AI suggestions
-      // For now, show placeholder suggestions
-      setAISuggestions({
-        constitution: `Our Family Constitution
-
-1. We communicate with honesty and respect
-2. We support each other through challenges
-3. We celebrate each other's victories
-4. We make decisions together
-5. We spend quality time as a family
-6. We resolve conflicts with compassion
-7. We grow and learn together
-8. We maintain family traditions
-9. We help those in need
-10. We have fun and enjoy life`,
+      const result = await generateConstitution(family?.name || 'Our Family', {
+        currentConstitution: draftConstitution,
+        mission: charter?.mission,
+        values: draftValues,
       });
+      setAISuggestions({ constitution: result.constitution });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to generate suggestions');
     } finally {
@@ -40,7 +33,7 @@ export default function ConstitutionScreen() {
   };
 
   const handleContinue = () => {
-    if (!draftConstitution.trim()) {
+    if (!draftConstitution?.trim()) {
       setError('Please fill in your Family Constitution');
       return;
     }
@@ -65,7 +58,7 @@ export default function ConstitutionScreen() {
 
           {/* Error Message */}
           {error && (
-            <View className="mb-6 p-4 bg-error/10 rounded-lg border border-error/20">
+            <View className="mb-6 p-4 bg-error/10 rounded-lg">
               <Text className="text-sm text-error font-medium">{error}</Text>
             </View>
           )}

@@ -6,6 +6,7 @@ import { useOnboardingStore } from '@/lib/stores/onboarding-store';
 import { useFamilyStore } from '@/lib/stores/family-store';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { useColors } from '@/hooks/use-colors';
+import { supabase } from '@/lib/_core/supabase';
 
 export default function OnboardingReadyScreen() {
   const router = useRouter();
@@ -33,7 +34,7 @@ export default function OnboardingReadyScreen() {
 
       const { addMember } = useFamilyStore.getState();
       await addMember(family.id, {
-        name: user.user_metadata?.full_name || user.email || 'Admin',
+        name: 'Admin',
         role: 'admin',
         user_id: user.id,
         has_login: true,
@@ -46,6 +47,12 @@ export default function OnboardingReadyScreen() {
     // Mark onboarding as complete
     completeOnboarding();
 
+    await supabase.functions.invoke('send-welcome-email', {
+      body: {
+        email: user.email,
+        familyName: familyName,
+      },
+    });
     // Clear onboarding draft state now that it's persisted to Supabase
     reset();
 

@@ -11,9 +11,11 @@ const env = {
 };
 
 const config: ExpoConfig = {
+  owner: "kinos.family",
   name: env.appName,
   slug: env.appSlug,
   version: "1.0.0",
+  platforms: ["ios", "android"],
   orientation: "portrait",
   icon: "./assets/images/icon.png",
   scheme: env.scheme,
@@ -50,11 +52,6 @@ const config: ExpoConfig = {
         category: ["BROWSABLE", "DEFAULT"],
       },
     ],
-  },
-  web: {
-    bundler: "metro",
-    output: "static",
-    favicon: "./assets/images/favicon.png",
   },
   plugins: [
     "expo-router",
@@ -95,8 +92,19 @@ const config: ExpoConfig = {
   ],
   experiments: {
     typedRoutes: true,
-    reactCompiler: true,
+    reactCompiler: false,
   },
+  extra: {
+    eas: {
+      projectId: "842b7515-ba53-4e07-837f-185ad8b897d6",
+    },
+  },
+  updates: {
+    "url": "https://u.expo.dev/842b7515-ba53-4e07-837f-185ad8b897d6"
+  },
+  runtimeVersion: {
+    "policy": "fingerprint"
+  }
 };
 
 export default config;

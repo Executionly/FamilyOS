@@ -4,6 +4,8 @@ import { useRouter } from 'expo-router';
 import { ScreenContainer } from '@/components/screen-container';
 import { useCharterStore } from '@/lib/stores/charter-store';
 import { useColors } from '@/hooks/use-colors';
+import { generateMissionVision } from '@/lib/services/charter-ai';
+import { useFamilyStore } from '@/lib/stores/family-store';
 
 export default function MissionVisionScreen() {
   const router = useRouter();
@@ -11,17 +13,17 @@ export default function MissionVisionScreen() {
   const { draftMission, draftVision, setDraftMission, setDraftVision, aiSuggestions, setAISuggestions,charter } = useCharterStore();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { family } = useFamilyStore();
 
   const handleGenerateAISuggestions = async () => {
     setError(null);
     setLoading(true);
     try {
-      // TODO: Call Supabase Edge Function to generate AI suggestions
-      // For now, show placeholder suggestions
-      setAISuggestions({
-        mission: 'Our mission is to build a strong, connected family that supports each other through life\'s journey.',
-        vision: 'We envision a family where every member feels valued, heard, and empowered to achieve their dreams.',
+      const result = await generateMissionVision(family?.name || 'Our Family', {
+        currentMission: draftMission,
+        currentVision: draftVision,
       });
+      setAISuggestions({ mission: result.mission, vision: result.vision });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to generate suggestions');
     } finally {
@@ -30,7 +32,7 @@ export default function MissionVisionScreen() {
   };
 
   const handleContinue = () => {
-    if (!draftMission.trim() || !draftVision.trim()) {
+    if (!draftMission?.trim() || !draftVision?.trim()) {
       setError('Please fill in both Mission and Vision');
       return;
     }
@@ -55,7 +57,7 @@ export default function MissionVisionScreen() {
 
           {/* Error Message */}
           {error && (
-            <View className="mb-6 p-4 bg-error/10 rounded-lg border border-error/20">
+            <View className="mb-6 p-4 bg-error/10 rounded-lg">
               <Text className="text-sm text-error font-medium">{error}</Text>
             </View>
           )}
@@ -69,7 +71,7 @@ export default function MissionVisionScreen() {
             <TextInput
               placeholder="e.g., To love, support, and grow together as a family..."
               placeholderTextColor={colors.muted}
-              value={charter?.mission}
+              value={draftMission || charter?.mission}
               onChangeText={setDraftMission}
               multiline
               numberOfLines={4}
@@ -92,7 +94,7 @@ export default function MissionVisionScreen() {
             <TextInput
               placeholder="e.g., A family where everyone feels safe, heard, and empowered..."
               placeholderTextColor={colors.muted}
-              value={charter?.vision}
+              value={draftVision || charter?.vision}
               onChangeText={setDraftVision}
               multiline
               numberOfLines={4}
@@ -116,7 +118,10 @@ export default function MissionVisionScreen() {
                   <Text className="text-xs text-muted mb-1">Suggested Mission:</Text>
                   <Text className="text-sm text-foreground">{aiSuggestions.mission}</Text>
                   <Pressable
-                    onPress={() => setDraftMission(aiSuggestions.mission || '')}
+                    onPress={() => {
+                      console.log("TTT")
+                      setDraftMission(aiSuggestions.mission || '')
+                    }}
                     className="mt-2"
                   >
                     <Text className="text-xs font-semibold text-primary">Use this</Text>
