@@ -13,6 +13,8 @@ import { useColors } from '@/hooks/use-colors';
 import { supabase } from '@/lib/_core/supabase';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { Image } from 'expo-image';
+import { useFamilyStore } from '@/lib/stores/family-store';
+import { isAdminAccess } from '@/utils';
 
 const TYPE_ICON: Record<Memory['type'], keyof typeof Ionicons.glyphMap> = {
   photo: 'image-outline',
@@ -25,41 +27,44 @@ export default function MemoryDetailScreen() {
   const colors = useColors();
   const { id } = useLocalSearchParams();
   const { memories, loading, deleteMemory, getSignedUrl } = useMemoriesStore();
+  const {members, currentMember} = useFamilyStore()
 
   const [memory, setMemory] = useState<Memory | null>(null);
   const [memoryLoading, setMemoryLoading] = useState(true);
   const [signedUrl, setSignedUrl] = useState<string | null>(null);
   const [urlLoading, setUrlLoading] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const isEditor = isAdminAccess(currentMember?.role)
+  const memberName = (id?: string | null) => members?.find((m) => m.id === id)?.name ?? null;
 
-const player = useVideoPlayer(
-  memory?.type === 'clip' && signedUrl ? signedUrl : null,
-  (p) => { p.loop = false; }
-);
+  const player = useVideoPlayer(
+    memory?.type === 'clip' && signedUrl ? signedUrl : null,
+    (p) => { p.loop = false; }
+  );
   // Find memory from store
   useEffect(() => {
-  if (!id || typeof id !== 'string') return;
+    if (!id || typeof id !== 'string') return;
 
-  // Try store first (instant if already loaded)
-  const found = memories.find((m) => m.id === id);
+    // Try store first (instant if already loaded)
+    const found = memories.find((m) => m.id === id);
 
-  if (found) {
-    setMemory(found);
-    setMemoryLoading(false);
-    return;
-  }
-
-  // Fall back to direct Supabase fetch
-  supabase
-    .from('memory')
-    .select('*')
-    .eq('id', id)
-    .single()
-    .then(({ data, error }) => {
-      if (!error && data) setMemory(data);
+    if (found) {
+      setMemory(found);
       setMemoryLoading(false);
-    });
-}, [id, memories]);
+      return;
+    }
+
+    // Fall back to direct Supabase fetch
+    supabase
+      .from('memory')
+      .select('*')
+      .eq('id', id)
+      .single()
+      .then(({ data, error }) => {
+        if (!error && data) setMemory(data);
+        setMemoryLoading(false);
+      });
+  }, [id, memories]);
 
   // Resolve storage path → signed URL
   useEffect(() => {
@@ -98,8 +103,8 @@ const player = useVideoPlayer(
       ]
     );
   };
-console.log("memory",memory)
-    if (memoryLoading) {
+
+  if (memoryLoading) {
         return (
             <ScreenContainer containerClassName="bg-background" safeAreaClassName="bg-background">
             <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
@@ -129,18 +134,24 @@ console.log("memory",memory)
         title="Memory"
         showBack
         right={
-          <Pressable
-            onPress={handleDelete}
-            disabled={deleting}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            style={({ pressed }) => ({ opacity: pressed || deleting ? 0.5 : 1 })}
-          >
-            {deleting ? (
-              <ActivityIndicator size="small" color="#EF4444" />
-            ) : (
-              <Ionicons name="trash-outline" size={20} color="#EF4444" />
-            )}
-          </Pressable>
+          <>
+            {
+              currentMember?.user_id === memory.created_by || isEditor ? (
+              <Pressable
+                onPress={handleDelete}
+                disabled={deleting}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                style={({ pressed }) => ({ opacity: pressed || deleting ? 0.5 : 1 })}
+              >
+                {deleting ? (
+                  <ActivityIndicator size="small" color="#EF4444" />
+                ) : (
+                  <Ionicons name="trash-outline" size={20} color="#EF4444" />
+                )}
+              </Pressable>
+            ) : null
+            }
+          </>
         }
       />
 
@@ -255,7 +266,7 @@ console.log("memory",memory)
                       }}
                     >
                       <Text className='capitalize'
-                      style={{ color: '#fff', fontSize: 12, fontWeight: '600' }}>{tag}</Text>
+                      style={{ color: '#fff', fontSize: 12, fontWeight: '600' }}>{memberName(tag)}</Text>
                     </View>
                   ))}
                 </View>

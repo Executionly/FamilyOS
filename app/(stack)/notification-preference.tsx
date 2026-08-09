@@ -36,8 +36,8 @@ function ToggleRow({ label, description, value, onValueChange, disabled }: Toggl
         value={value}
         onValueChange={onValueChange}
         disabled={disabled}
-        trackColor={{ false: '#E5E7EB', true: '#FDE68A' }}
-        thumbColor={value ? '#F59E0B' : '#9CA3AF'}
+        trackColor={{ false: '#E5E7EB', true: '#0a7ea4' }}
+        thumbColor={value ? '#fff' : '#9CA3AF'}
         ios_backgroundColor="#E5E7EB"
       />
     </View>
@@ -115,7 +115,7 @@ export default function NotificationPreferencesScreen() {
       >
         {/* ── Push Notifications ── */}
         <SectionHeader
-          title="📱 Push Notifications"
+          title="Push Notifications"
           subtitle="Alerts that appear on your device"
         />
 

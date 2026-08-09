@@ -5,6 +5,8 @@ import { ScreenContainer } from '@/components/screen-container';
 import { useColors } from '@/hooks/use-colors';
 import { useStoriesStore, Story } from '@/lib/stores/stories-store';
 import { AppHeader } from '@/components/app-header';
+import { isAdminAccess } from '@/utils';
+import { useFamilyStore } from '@/lib/stores/family-store';
 
 export default function StoryDetailScreen() {
   const router = useRouter();
@@ -13,6 +15,8 @@ export default function StoryDetailScreen() {
   const { stories, loading, deleteStory } = useStoriesStore();
   const [story, setStory] = useState<Story | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const {currentMember} = useFamilyStore()
+  const isEditor = isAdminAccess(currentMember?.role)
 
   useEffect(() => {
     if (id && typeof id === 'string') {
@@ -46,6 +50,7 @@ export default function StoryDetailScreen() {
     }
   };
 
+  console.log("story",story)
   if (loading || !story) {
     return (
       <ScreenContainer containerClassName="bg-background" safeAreaClassName="bg-background">
@@ -60,10 +65,17 @@ export default function StoryDetailScreen() {
     <ScreenContainer containerClassName="bg-background" safeAreaClassName="bg-background">
         <AppHeader title="Memory Details" showBack 
         right={
-            <Pressable onPress={handleDelete} disabled={deleting}>
-              <Text className="text-red-500 font-semibold">{deleting ? 'Deleting...' : 'Delete'}</Text>
-            </Pressable>
-        }/>
+          <>
+            {
+              currentMember?.user_id === story.created_by || isEditor ? (
+                <Pressable onPress={handleDelete} disabled={deleting}>
+                  <Text className="text-red-500 font-semibold">{deleting ? 'Deleting...' : 'Delete'}</Text>
+                </Pressable>
+            ) : null
+            }
+          </>
+        }
+        />
       <ScrollView contentContainerStyle={{ flexGrow: 1 }} showsVerticalScrollIndicator={false}>
         <View className="flex-1 px-6 pb-8">
 

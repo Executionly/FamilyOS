@@ -11,6 +11,9 @@ export type NotificationType =
   | 'commitment_due'
   | 'chore_overdue'
   | 'weekly_summary'
+  | 'group_chat_message'
+  | 'member_joined'
+  | 'direct_message'
   | 'security_alert';
 
 export type NotificationPriority = 'critical' | 'important' | 'informational';
@@ -29,6 +32,7 @@ interface BasePayload {
 interface BroadcastPayload extends BasePayload {
   title: string;
   body: string;
+  excludeUserId?: string;
 }
 
 // ── Targeted + broadcast ──────────────────────────────────────
@@ -52,6 +56,7 @@ interface TargetedPayload extends BasePayload {
 async function invokeSendPush(payload: {
   family_id: string;
   user_id?: string | null;
+  exclude_user_id?: string | null;
   type: NotificationType;
   priority: NotificationPriority;
   title: string;
@@ -75,7 +80,7 @@ async function getFamilyMemberUserIds(familyId: string): Promise<string[]> {
     .from('member')
     .select('user_id')
     .eq('family_id', familyId)
-    .eq('has_login', true)
+    // .eq('has_login', true)
     .not('user_id', 'is', null);
 
   if (error || !data) return [];
@@ -87,12 +92,25 @@ async function getFamilyMemberUserIds(familyId: string): Promise<string[]> {
 async function getMemberUserId(memberId: string): Promise<string | null> {
   const { data, error } = await supabase
     .from('member')
-    .select('user_id, has_login')
+    .select('user_id')
     .eq('id', memberId)
     .single();
-
-  if (error || !data || !data.has_login) return null;
+  if (error || !data) return null;
   return data.user_id || null;
+}
+
+async function getFamilyAdminUserIds(familyId: string): Promise<string[]> {
+  const { data, error } = await supabase
+    .from('member')
+    .select('user_id')
+    .eq('family_id', familyId)
+    .in('role', ['admin', 'mother', 'father', 'coparent'])
+    .eq('has_login', true)
+    .not('user_id', 'is', null);
+
+  if (error || !data) return [];
+
+  return data.map((m) => m.user_id).filter(Boolean) as string[];
 }
 
 // ── Public API ────────────────────────────────────────────────
@@ -102,16 +120,60 @@ async function getMemberUserId(memberId: string): Promise<string | null> {
  * Use for: meeting scheduled, new event, family announcement, AI insight.
  */
 export async function notifyFamily(payload: BroadcastPayload) {
+
   await invokeSendPush({
     family_id: payload.familyId,
-    user_id: null, // null = send to all family members (handled in Edge Function)
+    user_id: null,
     type: payload.type,
     priority: payload.priority,
     title: payload.title,
     body: payload.body,
     action_label: payload.actionLabel,
     action_route: payload.actionRoute,
+    exclude_user_id: payload.excludeUserId
   });
+//   if (!payload.excludeUserId) {
+//     // No exclusion needed — broadcast as before
+//     return;
+//   }
+
+//   // Exclusion requested — resolve member list and send individually, skipping excludeUserId
+//   const allMemberUserIds = await getFamilyMemberUserIds(payload.familyId);
+//   const recipients = allMemberUserIds.filter((uid) => uid !== payload.excludeUserId);
+// console.log("allMemberUserIds",allMemberUserIds)
+// console.log("recipients",recipients)
+//   for (const userId of recipients) {
+//     console.log("SENT")
+//     await invokeSendPush({
+//       family_id: payload.familyId,
+//       user_id: userId,
+//       type: payload.type,
+//       priority: payload.priority,
+//       title: payload.title,
+//       body: payload.body,
+//       action_label: payload.actionLabel,
+//       action_route: payload.actionRoute,
+//     });
+//   }
+}
+
+
+export async function notifyAdmins(payload: BroadcastPayload) {
+  const adminUserIds = await getFamilyAdminUserIds(payload.familyId);
+
+  for (const userId of adminUserIds) {
+    if (userId === payload.excludeUserId) continue;
+    await invokeSendPush({
+      family_id: payload.familyId,
+      user_id: userId,
+      type: payload.type,
+      priority: payload.priority,
+      title: payload.title,
+      body: payload.body,
+      action_label: payload.actionLabel,
+      action_route: payload.actionRoute,
+    });
+  }
 }
 
 /**
@@ -179,8 +241,8 @@ export async function notifyMember(
   payload: Omit<BroadcastPayload, 'familyId'> & { familyId: string },
 ) {
   const userId = await getMemberUserId(memberId);
-  if (!userId) return; // member has no account — skip silently
 
+  if (!userId) return; // member has no account — skip silently
   await invokeSendPush({
     family_id: payload.familyId,
     user_id: userId,

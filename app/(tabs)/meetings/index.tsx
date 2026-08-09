@@ -1,30 +1,40 @@
-import { ScrollView, Text, View, Pressable, ActivityIndicator, FlatList, TouchableOpacity } from 'react-native';
+import { ScrollView, Text, View, Pressable, ActivityIndicator, FlatList, TouchableOpacity, Linking, RefreshControl } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { ScreenContainer } from '@/components/screen-container';
 import { useColors } from '@/hooks/use-colors';
 import { useFamilyStore } from '@/lib/stores/family-store';
 import { useMeetingStore } from '@/lib/stores/meeting-store';
 import { useCommitmentStore } from '@/lib/stores/commitment-store';
-import { MaterialIcons } from '@expo/vector-icons';
+import { Ionicons, MaterialIcons } from '@expo/vector-icons';
+import { isAdminAccess } from '@/utils';
+import * as WebBrowser from "expo-web-browser";
 
 export default function MeetingsScreen() {
   const router = useRouter();
   const colors = useColors();
-  const { family } = useFamilyStore();
+  const { family, currentMember } = useFamilyStore();
   const { meetings, loading: meetingsLoading, error: meetingsError, fetchMeetings } = useMeetingStore();
   const { commitments, loading: commitmentsLoading, error: commitmentsError, fetchCommitments, updateCommitment } = useCommitmentStore();
+  const [refreshing, setRefreshing] = useState(false)
+  const isEditor = isAdminAccess(currentMember?.role)
 
   const handleFetch = () => {
     if(!family?.id) return
-    fetchMeetings(family.id);
-    fetchCommitments(family.id);
+    setRefreshing(true)
+    try {
+      fetchMeetings(family.id);
+      fetchCommitments(family.id);
+    } finally {
+      setRefreshing(false)
+    }
   }
   useEffect(() => {
     if (family?.id) {
       handleFetch()
     }
   }, [family?.id, fetchMeetings, fetchCommitments]);
+
 
   const getStatusBadgeColor = (status: string) => {
     switch (status) {
@@ -65,7 +75,7 @@ export default function MeetingsScreen() {
   const handleAddCommitment = () => {
     router.push('/meetings/create-commitment');
   };
-console.log('commitments',commitments)
+
   const openCommitments = commitments.filter((c) => c.status === 'open');
   const loading = meetingsLoading || commitmentsLoading;
 
@@ -78,19 +88,16 @@ console.log('commitments',commitments)
       </ScreenContainer>
     );
   }
-console.log('openCommitments',openCommitments)
+
+
   return (
     <ScreenContainer containerClassName="bg-background" safeAreaClassName="bg-background">
-      <ScrollView contentContainerStyle={{ flexGrow: 1 }} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+      contentContainerStyle={{ flexGrow: 1 }} 
+      showsVerticalScrollIndicator={false}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleFetch} />}>
         <View className="flex-1 px-6 pb-8">
-          <View className='flex-row items-center justify-between'>
-            <Text className="text-2xl font-bold text-foreground mb-6">Meetings & Commitments</Text>
-            <TouchableOpacity
-              onPress={handleFetch}
-            >
-              {loading ? <ActivityIndicator size={"small"}/> : <MaterialIcons name="refresh" size={24} color="black" />}
-            </TouchableOpacity>
-          </View>
+            <Text className="text-2xl font-bold text-foreground mb-6 text-center">Meetings & Commitments</Text>
           {(meetingsError || commitmentsError) && (
             <View className="bg-red-100 rounded-lg p-3 mb-4">
               <Text className="text-red-800 text-sm">{meetingsError || commitmentsError}</Text>
@@ -101,9 +108,9 @@ console.log('openCommitments',openCommitments)
           <View className="mb-8">
             <View className="flex-row justify-between items-center mb-4">
               <Text className="text-lg font-semibold text-foreground">Family Meetings</Text>
-              <Pressable onPress={handleStartMeeting}>
+              {isEditor && <Pressable onPress={handleStartMeeting}>
                 <Text className="text-primary font-semibold">+ New</Text>
-              </Pressable>
+              </Pressable>}
             </View>
 
             {meetings.length === 0 ? (
@@ -118,31 +125,74 @@ console.log('openCommitments',openCommitments)
             ) : (
               <FlatList
                 scrollEnabled={false}
-                data={meetings}
+                data={meetings?.slice(0,2)}
                 keyExtractor={(item) => item.id}
                 renderItem={({ item }) => (
                   <Pressable
                     onPress={() => handleMeetingPress(item.id)}
-                    className="mb-3 p-4 rounded-lg border border-border"
-                    style={{ backgroundColor: colors.surface }}
+                    className="mb-3 rounded-2xl border border-border bg-surface p-4"
                   >
-                    <View className="flex-row justify-between items-start mb-2">
-                      <View className="flex-1">
-                        <Text className="text-base font-semibold text-foreground">
-                          {item.title}
-                        </Text>
-                        <Text className="text-xs text-muted mt-1">
-                          {formatDate(item.scheduled_date)} • {item.duration_minutes} min
+                    {/* Top row: title + status */}
+                    <View className="flex-row items-start justify-between">
+                      <View className="flex-1 pr-2">
+                        <Text className="text-base font-bold text-foreground">{item.title}</Text>
+                        <Text className="mt-1 text-xs text-muted">
+                          {formatDate(item.scheduled_date)} · {item.duration_minutes} min
                         </Text>
                       </View>
                       <View
-                        className="px-2 py-1 rounded-full"
+                        className="rounded-full px-2.5 py-1"
                         style={{ backgroundColor: getStatusBadgeColor(item.status) }}
                       >
-                        <Text className="text-white text-xs font-semibold capitalize">
-                          {item.status}
-                        </Text>
+                        <Text className="text-xs font-semibold capitalize text-white">{item.status}</Text>
                       </View>
+                    </View>
+
+                    {/* Meta row: occurrence + link indicator */}
+                    {(item.occurrence || item.meeting_link) && (
+                      <View className="mt-3 flex-row flex-wrap items-center gap-2 border-t border-border pt-3">
+                        {item.occurrence && (
+                          <View className="flex-row items-center rounded-full bg-primary/10 px-2.5 py-1">
+                            <Ionicons name="repeat-outline" size={12} color={colors.primary} />
+                            <Text className="ml-1 text-[11px] font-semibold capitalize text-primary">
+                              {item.occurrence}
+                            </Text>
+                          </View>
+                        )}
+                        {item.meeting_link && (
+                          <View className="flex-row items-center rounded-full bg-primary/10 px-2.5 py-1">
+                            <Ionicons name="videocam-outline" size={12} color={colors.primary} />
+                            <Text className="ml-1 text-[11px] font-semibold text-primary">Video link</Text>
+                          </View>
+                        )}
+                      </View>
+                    )}
+
+                    <View className='flex-row items-center mt-2 gap-2 flex-wrap'>
+                      {/* Join button — only when there's a link and the meeting hasn't happened yet */}
+                      {item.meeting_link && item.status !== 'completed' && item.status !== 'cancelled' && (
+                        <Pressable
+                          onPress={async(e) => {
+                            e.stopPropagation();
+                            if(item.meeting_link)
+                              await WebBrowser.openBrowserAsync(item.meeting_link);
+                          }}
+                          className="flex-1 flex-row items-center justify-center rounded-xl bg-primary py-2.5"
+                        >
+                          <Ionicons name="videocam" size={15} color="#fff" />
+                          <Text className="ml-1.5 text-xs font-bold text-white">Join Meeting</Text>
+                        </Pressable>
+                      )}
+                      <Pressable
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          router.push(`/meetings/edit?meetingId=${item.id}`);
+                        }}
+                        className="flex-row items-center self-start rounded-lg border border-border px-3 py-2.5"
+                      >
+                        <Ionicons name="pencil-outline" size={13} color={colors.foreground} />
+                        <Text className="ml-1.5 text-xs font-semibold text-foreground">Edit</Text>
+                      </Pressable>
                     </View>
                   </Pressable>
                 )}
@@ -150,16 +200,29 @@ console.log('openCommitments',openCommitments)
             )}
           </View>
 
+          {
+            meetings?.length > 2 && 
+            <View className="px-6 pb-4 -mt-8">
+              <Pressable
+                onPress={()=>router.push('/member-list')}
+                className="py-2 rounded-lg items-center"
+                style={{ backgroundColor: colors.primary }}
+              >
+                <Text className="text-white font-semibold text-xs">View all meetings</Text>
+              </Pressable>
+            </View>
+          }
+
           {/* Open Commitments Section */}
           <View>
             <View className="flex-row justify-between items-center mb-4">
               <Text className="text-lg font-semibold text-foreground">Open Commitments</Text>
-              <Pressable onPress={handleAddCommitment}>
+              {isEditor && <Pressable onPress={handleAddCommitment}>
                 <Text className="text-primary font-semibold">+ Add</Text>
-              </Pressable>
+              </Pressable>}
             </View>
 
-            {openCommitments.length === 0 ? (
+            {openCommitments?.length === 0 ? (
               <View 
                 className="rounded-lg border border-border p-6 items-center"
                 style={{ backgroundColor: colors.surface }}
@@ -259,14 +322,14 @@ console.log('openCommitments',openCommitments)
         </View>
       </ScrollView>
 
-      {meetings.length > 0 && (
-        <View className="px-6 pb-8">
+      {meetings?.length > 0 && isEditor && (
+        <View className="px-6 pb-4">
           <Pressable
             onPress={handleStartMeeting}
-            className="py-4 rounded-lg items-center"
+            className="py-3 rounded-lg items-center"
             style={{ backgroundColor: colors.primary }}
           >
-            <Text className="text-white font-semibold text-lg">Start New Meeting</Text>
+            <Text className="text-white font-semibold text-base">Start New Meeting</Text>
           </Pressable>
         </View>
       )}

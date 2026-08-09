@@ -1,7 +1,12 @@
 import { create } from 'zustand';
 import { supabase } from '@/lib/_core/supabase';
 import { notifyAssignment, notifyFamily } from '../services/notify';
+import { embedContent } from '../services/embed-content';
+import { useFamilyStore } from './family-store';
+import { useToastStore } from './toast-store';
+import { useAuthStore } from './auth-store';
 
+export type ChoreStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled'
 export interface Chore {
   id: string;
   family_id: string;
@@ -11,7 +16,7 @@ export interface Chore {
   assigned_to?: string;
   frequency: 'once' | 'daily' | 'weekly' | 'monthly';
   due_date?: string;
-  status: 'open' | 'in_progress' | 'completed' | 'cancelled';
+  status: ChoreStatus;
   points?: number;
   created_at: string;
   updated_at: string;
@@ -27,12 +32,74 @@ interface ChoreState {
   updateChore: (choreId: string, updates: Partial<Chore>) => Promise<void>;
   deleteChore: (choreId: string) => Promise<void>;
   setError: (error: string | null) => void;
+
+  channel: ReturnType<typeof supabase.channel> | null;
+  subscribeToRealtime: (familyId: string) => void;
+  unsubscribeFromRealtime: () => void;
 }
 
 export const useChoreStore = create<ChoreState>((set, get) => ({
   chores: [],
   loading: false,
   error: null,
+  channel: null,
+
+  subscribeToRealtime: (familyId: string) => {
+    const topic = `chores-${familyId}`;
+
+    // Check the Supabase client's own channel registry, not just local Zustand state —
+    // these can get out of sync during Fast Refresh / hot reload in dev
+    const existing = supabase.getChannels().find((ch) => ch.topic === `realtime:${topic}`);
+    if (existing) {
+      supabase.removeChannel(existing);
+    }
+    const channel = supabase
+      .channel(topic)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'chore', filter: `family_id=eq.${familyId}` },
+        (payload) => {
+          if (payload.eventType === 'INSERT') {
+            const newChore = payload.new as Chore;
+            const currentUserId = useAuthStore.getState().user?.id;
+            
+            set((state) => {
+              if (state.chores.some((c) => c.id === newChore.id)) return state;
+              return { chores: [newChore, ...state.chores] };
+            });
+            
+            if (newChore.created_by === currentUserId) return;
+            // Toast only if relevant to the current user
+            const currentMember = useFamilyStore.getState().currentMember;
+            if (currentMember && newChore.assigned_to === currentMember.id) {
+              useToastStore.getState().showToast({
+                title: 'New chore assigned to you',
+                body: newChore.title,
+                variant: 'assigned',
+                actionRoute: '/(stack)/chores',
+              });
+            }
+          } else if (payload.eventType === 'UPDATE') {
+            set((state) => ({
+              chores: state.chores.map((c) => (c.id === payload.new.id ? (payload.new as Chore) : c)),
+            }));
+          } else if (payload.eventType === 'DELETE') {
+            set((state) => ({
+              chores: state.chores.filter((c) => c.id !== payload.old.id),
+            }));
+          }
+        }
+      )
+      .subscribe();
+
+    set({ channel });
+  },
+
+  unsubscribeFromRealtime: () => {
+    const { channel } = get();
+    if (channel) supabase.removeChannel(channel);
+    set({ channel: null });
+  },
 
   fetchChores: async (familyId: string) => {
     set({ loading: true });
@@ -80,6 +147,12 @@ export const useChoreStore = create<ChoreState>((set, get) => ({
         },
         actionLabel: 'View Chores',
         actionRoute: '/(tabs)',
+      });
+      embedContent({
+        family_id: familyId,
+        source_type: 'chore',
+        source_id: data.id,
+        content: `Chore: ${data.title}. ${data.description ?? ''}${data.due_date ? ` Due ${new Date(data.due_date).toLocaleDateString()}.` : ''}`,
       });
       return data;
     } catch (error) {

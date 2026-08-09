@@ -7,71 +7,85 @@ import { useFamilyStore } from '@/lib/stores/family-store';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { useColors } from '@/hooks/use-colors';
 import { supabase } from '@/lib/_core/supabase';
+import { Ionicons } from '@expo/vector-icons';
 
 export default function OnboardingReadyScreen() {
   const router = useRouter();
   const colors = useColors();
   const { familyName, members, completeOnboarding, reset } = useOnboardingStore();
   const { createFamily } = useFamilyStore();
-  const { user } = useAuthStore();
+  const { user, userSignupMeta, initialize } = useAuthStore();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleStartFoundationBuilder = async () => {
-  setError(null);
-  setLoading(true);
+    setError(null);
+    setLoading(true);
 
-  try {
-    if (!user) throw new Error('User not authenticated');
+    try {
+      if (!user) throw new Error('User not authenticated');
 
-    // Create family in database — capture the returned row, we need its id
-    await useFamilyStore.getState().fetchFamilyForUser(user.id);
-    const existingFamily = useFamilyStore.getState().family;
+      // Create family in database — capture the returned row, we need its id
+      await useFamilyStore.getState().fetchFamilyForUser(user.id);
+      const existingFamily = useFamilyStore.getState().family;
 
-    let family = existingFamily;
-    if (!family) {
-      family = await createFamily(familyName, user.id);
+      let family = existingFamily;
+      if (!family) {
+        family = await createFamily(familyName, user.id);
 
-      const { addMember } = useFamilyStore.getState();
-      await addMember(family.id, {
-        name: 'Admin',
-        role: 'admin',
-        user_id: user.id,
-        has_login: true,
-      });
-      for (const member of members) {
-        await addMember(family.id, member);
+        const { addMember } = useFamilyStore.getState();
+        await addMember(family.id, {
+          name: userSignupMeta?.full_name ? userSignupMeta?.full_name : 'Admin',
+          role: userSignupMeta?.roleType ? userSignupMeta?.roleType : 'admin',
+          user_id: user.id,
+          has_login: true,
+        });
+        for (const member of members) {
+          await addMember(family.id, member);
+        }
       }
+
+      // Mark onboarding as complete
+      completeOnboarding();
+
+      await supabase.functions.invoke('send-welcome-email', {
+        body: {
+          email: user.email,
+          familyName: familyName,
+        },
+      });
+      // Clear onboarding draft state now that it's persisted to Supabase
+      reset();
+
+      // Navigate to Foundation Builder
+      await initialize()
+      router.replace('/(tabs)');
+    } catch (err) {
+      const message =
+        (err as any)?.message ||
+        (err as any)?.details ||
+        (err instanceof Error ? err.message : 'Something went wrong');
+      console.error('[OnboardingReady] Failed to save family/members:', err);
+      setError(message);
+    } finally {
+      setLoading(false);
     }
-
-    // Mark onboarding as complete
-    completeOnboarding();
-
-    await supabase.functions.invoke('send-welcome-email', {
-      body: {
-        email: user.email,
-        familyName: familyName,
-      },
-    });
-    // Clear onboarding draft state now that it's persisted to Supabase
-    reset();
-
-    // Navigate to Foundation Builder
-    router.replace('/(tabs)');
-  } catch (err) {
-    const message =
-      (err as any)?.message ||
-      (err as any)?.details ||
-      (err instanceof Error ? err.message : 'Something went wrong');
-    console.error('[OnboardingReady] Failed to save family/members:', err);
-    setError(message);
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   return (
     <ScreenContainer containerClassName="bg-background" safeAreaClassName="bg-background">
+      <View className='px-7 py-4'>
+        <Pressable
+        onPress={() => router.back()}
+        className="mt-2 mx-5 h-11 w-11 items-center justify-center rounded-full bg-surface"
+      >
+        <Ionicons
+          name="arrow-back"
+          size={22}
+          color={colors.foreground}
+        />
+      </Pressable>
+      </View>
       <ScrollView
         contentContainerStyle={{ flexGrow: 1 }}
         showsVerticalScrollIndicator={false}

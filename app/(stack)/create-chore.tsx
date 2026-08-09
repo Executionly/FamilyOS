@@ -39,7 +39,7 @@ export default function CreateChoreScreen() {
         assigned_to: selectedAssignee || undefined,
         frequency,
         due_date: dueDate?.toISOString(),
-        status: 'open',
+        status: 'pending',
       });
 
       router.back();

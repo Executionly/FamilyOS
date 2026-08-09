@@ -1,7 +1,5 @@
 import { View, Text, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-import { useColors } from '@/hooks/use-colors';
 
 interface AppHeaderProps {
   title: string;
@@ -13,15 +11,6 @@ interface AppHeaderProps {
 
 export function AppHeader({ title, subtitle, showBack = false, onBack, right }: AppHeaderProps) {
   const router = useRouter();
-  const colors = useColors();
-
-  const handleBack = () => {
-    if (onBack) {
-      onBack();
-    } else {
-      router.back();
-    }
-  };
 
   return (
     <View className="flex-row items-center justify-between mb-6 px-6 pb-3 border-b border-b-gray-200">
@@ -31,8 +20,8 @@ export function AppHeader({ title, subtitle, showBack = false, onBack, right }: 
 
       {title && <View 
       style={{ flex: 1 }}>
-        <Text className='text-center' 
-        style={{ color: '#fff', fontSize: 18, fontWeight: '700', lineHeight: 22 }}>
+        <Text className='text-center text-primary' 
+        style={{fontSize: 18, fontWeight: '700', lineHeight: 22 }}>
           {title}
         </Text>
         {subtitle && (

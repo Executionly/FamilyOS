@@ -1,6 +1,9 @@
 import { create } from 'zustand';
 import { supabase } from '@/lib/_core/supabase';
 import { notifyAssignment, notifyFamily } from '../services/notify';
+import { embedContent } from '../services/embed-content';
+import { useAuthStore } from './auth-store';
+import { useToastStore } from './toast-store';
 
 export interface Story {
   id: string;
@@ -21,12 +24,64 @@ interface StoriesState {
   createStory: (story: Partial<Story>) => Promise<Story>;
   updateStory: (id: string, updates: Partial<Story>) => Promise<void>;
   deleteStory: (id: string) => Promise<void>;
+
+  channel: ReturnType<typeof supabase.channel> | null;
+  subscribeToRealtime: (familyId: string) => void;
+  unsubscribeFromRealtime: () => void;
 }
 
 export const useStoriesStore = create<StoriesState>((set, get) => ({
   stories: [],
   loading: false,
   error: null,
+  channel: null,
+
+  subscribeToRealtime: (familyId: string) => {
+    const channel = supabase
+      .channel(`stories-${familyId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'story', filter: `family_id=eq.${familyId}` },
+        (payload) => {
+          if (payload.eventType === 'INSERT') {
+            const newStory = payload.new as Story;
+            const currentUserId = useAuthStore.getState().user?.id;
+
+            set((state) => {
+              if (state.stories.some((s) => s.id === newStory.id)) return state;
+              return { stories: [newStory, ...state.stories] };
+            });
+
+            if (newStory.created_by === currentUserId) return; // don't toast yourself
+
+            useToastStore.getState().showToast({
+              title: 'New family story added',
+              body: newStory.title,
+              variant: 'info',
+              actionRoute: '/(tabs)/legacy', // adjust to your actual Legacy OS route
+            });
+          } else if (payload.eventType === 'UPDATE') {
+            set((state) => ({
+              stories: state.stories.map((s) => (s.id === payload.new.id ? (payload.new as Story) : s)),
+            }));
+          } else if (payload.eventType === 'DELETE') {
+            set((state) => ({
+              stories: state.stories.filter((s) => s.id !== payload.old.id),
+            }));
+          }
+        }
+      )
+      .subscribe();
+
+    set({ channel });
+  },
+
+  unsubscribeFromRealtime: () => {
+    const { channel } = get();
+    if (channel) supabase.removeChannel(channel);
+    set({ channel: null });
+  },
+
   fetchStories: async (familyId) => {
     set({ loading: true });
     try {
@@ -87,6 +142,12 @@ export const useStoriesStore = create<StoriesState>((set, get) => ({
           });
         }
       }
+      embedContent({
+        family_id: data.family_id,
+        source_type: 'story',
+        source_id: data.id,
+        content: `${data.title}\n\n${data.body}`,
+      });
       return data;
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to create story';

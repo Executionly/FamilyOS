@@ -9,23 +9,17 @@ import { Ionicons } from '@expo/vector-icons';
 import { ScreenContainer } from '@/components/screen-container';
 import { useOnboardingStore } from '@/lib/stores/onboarding-store';
 import { useColors } from '@/hooks/use-colors';
+import { AgeBand, MemberRole, PRESET_AGE_BANDS, PRESET_ROLES } from '@/utils';
 
-// ── Types ─────────────────────────────────────────────────────
 
-type MemberRole = 'admin' | 'coparent' | 'member' | 'child' | string;
-type AgeBand = 'toddler' | 'child' | 'preteen' | 'teen' | 'adult' | string;
-
-const PRESET_ROLES: MemberRole[] = ['admin', 'coparent', 'member', 'child'];
-const PRESET_AGE_BANDS: AgeBand[] = ['toddler', 'child', 'preteen', 'teen', 'adult'];
-
-const ROLE_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
+export const ROLE_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
   admin: 'shield-checkmark-outline',
   coparent: 'people-outline',
   member: 'person-outline',
   child: 'happy-outline',
 };
 
-const ROLE_COLORS: Record<string, string> = {
+export const ROLE_COLORS: Record<string, string> = {
   admin: '#0a7ea4',
   coparent: '#7C3AED',
   member: '#16A34A',
@@ -34,7 +28,7 @@ const ROLE_COLORS: Record<string, string> = {
 
 // ── Custom input modal ────────────────────────────────────────
 
-function CustomInputModal({
+export function CustomInputModal({
   visible,
   title,
   placeholder,
@@ -128,7 +122,7 @@ function CustomInputModal({
 
 // ── Chip selector ─────────────────────────────────────────────
 
-function ChipSelector({
+export function ChipSelector({
   options,
   selected,
   onSelect,
@@ -138,7 +132,7 @@ function ChipSelector({
   options: string[];
   selected: string;
   onSelect: (value: string) => void;
-  onAddCustom: () => void;
+  onAddCustom?: () => void;
   colorMap?: Record<string, string>;
 }) {
   const colors = useColors();
@@ -177,7 +171,7 @@ function ChipSelector({
       })}
 
       {/* Custom chip */}
-      <Pressable
+      {/* <Pressable
         onPress={onAddCustom}
         style={{
           paddingHorizontal: 14, paddingVertical: 8,
@@ -189,7 +183,7 @@ function ChipSelector({
       >
         <Ionicons name="add-outline" size={14} color="#687076" />
         <Text style={{ fontSize: 13, fontWeight: '600', color: '#687076' }}>Custom</Text>
-      </Pressable>
+      </Pressable> */}
     </View>
   );
 }
@@ -312,7 +306,8 @@ export default function AddMembersScreen() {
     setLoading(true);
     try {
       nextStep();
-      router.push('/(onboarding)/invite-coparent');
+      router.push('/(onboarding)/ready');
+      // router.push('/(onboarding)/invite-coparent');
     } catch {
       setError('Something went wrong. Please try again.');
     } finally {
@@ -343,6 +338,17 @@ export default function AddMembersScreen() {
         }}
         onClose={() => setShowAgeBandModal(false)}
       />
+
+      <Pressable
+        onPress={() => router.back()}
+        className="mt-2 mx-5 h-11 w-11 items-center justify-center rounded-full bg-surface"
+      >
+        <Ionicons
+          name="arrow-back"
+          size={22}
+          color={colors.foreground}
+        />
+      </Pressable>
 
       <ScrollView
         contentContainerStyle={{ paddingBottom: 40 }}

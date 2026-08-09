@@ -13,7 +13,7 @@ export default function MeetingSetupScreen() {
   const router = useRouter();
   const colors = useColors();
   const { family } = useFamilyStore();
-  const { createMeeting, addAgendaItem } = useMeetingStore();
+  const { createMeeting, error, addAgendaItem } = useMeetingStore();
 
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [selectedTime, setSelectedTime] = useState(new Date());
@@ -23,7 +23,9 @@ export default function MeetingSetupScreen() {
   const [title, setTitle] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatingMessage, setGeneratingMessage] = useState('');
-
+  const [frequency, setFrequency] = useState<'once' | 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'bimonthly' | 'quaterly' | 'annually'>('weekly');
+  const [meetingLink, setMeetingLink] = useState('');
+  const [validationError, setValidationError] = useState<string | null>(null);
 
   const handleDateChange = (event: any, date?: Date) => {
     if (date) setSelectedDate(date);
@@ -37,6 +39,24 @@ export default function MeetingSetupScreen() {
 
   const handleGenerateAgenda = async () => {
     if (!family?.id) return;
+
+    // Validation
+    if (!selectedDate?.toString()?.trim()) {
+      setValidationError('Date is required');
+      return;
+    }
+    if (!selectedTime?.toString()?.trim()) {
+      setValidationError('Time is required');
+      return;
+    }
+    if (!frequency?.toString()?.trim()) {
+      setValidationError('Occurrence is required');
+      return;
+    }
+    if (!duration?.toString()?.trim()) {
+      setValidationError('Duration is required');
+      return;
+    }
 
     setIsGenerating(true);
     try {
@@ -61,6 +81,8 @@ export default function MeetingSetupScreen() {
         description: 'AI-generated agenda',
         scheduled_date: scheduledDate.toISOString(),
         duration_minutes: duration,
+        occurrence: frequency,
+        meeting_link: meetingLink,
         status: 'scheduled',
       });
 
@@ -86,6 +108,8 @@ export default function MeetingSetupScreen() {
     }
   };
 
+  const displayError = validationError || error;
+
   if (isGenerating) {
     return (
       <ScreenContainer containerClassName="bg-background" safeAreaClassName="bg-background">
@@ -107,6 +131,13 @@ export default function MeetingSetupScreen() {
       <AppHeader title="Set Up Meeting" showBack />
       <ScrollView contentContainerStyle={{ flexGrow: 1 }} showsVerticalScrollIndicator={false}>
         <View className="flex-1 px-6 pb-8">
+
+          {/* Error Message */}
+          {displayError && (
+            <View className="mb-6 p-4 bg-error/10 rounded-lg border border-error/20">
+              <Text className="text-sm text-error font-medium">{displayError}</Text>
+            </View>
+          )}
 
           {/* Meeting Title */}
           <View className="mb-6">
@@ -165,6 +196,33 @@ export default function MeetingSetupScreen() {
             )}
           </View>
 
+          {/* Frequency */}
+          <View className="mb-6">
+            <Text className="text-sm font-semibold text-foreground mb-3">Occurrence</Text>
+            <View className="flex-row flex-wrap gap-2">
+              {(['once', 'daily', 'weekly', 'biweekly', 'monthly','bimonthly', 'quaterly','annually'] as const).map((f) => (
+                <Pressable
+                  key={f}
+                  onPress={() => setFrequency(f)}
+                  className={`flex-1 py-2 px-3 rounded-lg border min-w-[70px] ${
+                    frequency === f ? 'border-primary' : 'border-border'
+                  }`}
+                  style={{
+                    backgroundColor: frequency === f ? colors.primary : colors.surface,
+                  }}
+                >
+                  <Text
+                    className={`text-center font-semibold capitalize text-xs ${
+                      frequency === f ? 'text-white' : 'text-foreground'
+                    }`}
+                  >
+                    {f}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+
           {/* Duration Selector */}
           <View className="mb-8">
             <Text className="text-sm font-semibold text-foreground mb-3">Duration</Text>
@@ -190,6 +248,19 @@ export default function MeetingSetupScreen() {
                 </Pressable>
               ))}
             </View>
+          </View>
+
+          {/* Meeting Link */}
+          <View className="mb-6">
+            <Text className="text-sm font-semibold text-foreground mb-2">Meeting Link (Optional)</Text>
+            <TextInput
+              placeholder="e.g., google-meet"
+              value={meetingLink}
+              onChangeText={setMeetingLink}
+              placeholderTextColor={colors.muted}
+              className="px-4 py-3 rounded-lg border border-border text-foreground"
+              style={{ borderColor: colors.border, color: colors.foreground }}
+            />
           </View>
 
           {/* Generate Agenda Button */}

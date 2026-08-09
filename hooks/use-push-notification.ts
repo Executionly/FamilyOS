@@ -72,7 +72,7 @@ async function registerForPushNotifications(userId: string) {
   // Android channel
   if (Platform.OS === 'android') {
     await Notifications.setNotificationChannelAsync('default', {
-      name: 'FamilyOS Notifications',
+      name: 'Fambound Notifications',
       importance: Notifications.AndroidImportance.MAX,
       vibrationPattern: [0, 250, 250, 250],
       lightColor: '#F59E0B',

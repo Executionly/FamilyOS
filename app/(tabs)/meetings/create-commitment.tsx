@@ -7,12 +7,10 @@ import { useColors } from '@/hooks/use-colors';
 import { useFamilyStore } from '@/lib/stores/family-store';
 import { useCommitmentStore } from '@/lib/stores/commitment-store';
 import { AppHeader } from '@/components/app-header';
-import { useAuth } from '@/hooks/use-auth';
 
 export default function CreateCommitmentScreen() {
   const router = useRouter();
   const colors = useColors();
-  const {user} = useAuth()
   const { family, members } = useFamilyStore();
   const { createCommitment, loading } = useCommitmentStore();
 

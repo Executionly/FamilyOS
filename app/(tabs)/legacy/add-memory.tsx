@@ -224,7 +224,8 @@ export default function AddMemoryScreen() {
                     resizeMode="cover"
                   />
                 ) : (
-                  <View style={{
+                  <View  
+                  style={{
                     width: '100%', height: 220, borderRadius: 14,
                     backgroundColor: '#0F172A', alignItems: 'center', justifyContent: 'center',
                     borderWidth: 1, borderColor: colors.border,
@@ -251,6 +252,7 @@ export default function AddMemoryScreen() {
               /* Pick / Take buttons */
               <View style={{ flexDirection: 'row', gap: 10 }}>
                 <Pressable
+                  className='flex-col items-center justify-center'
                   onPress={pickImage}
                   style={({ pressed }) => ({
                     flex: 1, paddingVertical: 16, borderRadius: 14,
@@ -268,6 +270,7 @@ export default function AddMemoryScreen() {
 
                 {memoryType === 'photo' && (
                   <Pressable
+                    className='flex-col items-center justify-center'
                     onPress={takePhoto}
                     style={({ pressed }) => ({
                       flex: 1, paddingVertical: 16, borderRadius: 14,
@@ -356,8 +359,10 @@ export default function AddMemoryScreen() {
           </View>
         )}
 
+      </ScrollView>
         {/* Action buttons */}
-        <View style={{ flexDirection: 'row', gap: 12 }}>
+        <View className='px-5 mb-4'
+        style={{ flexDirection: 'row', gap: 12 }}>
           <Pressable
             onPress={() => router.back()}
             disabled={isBusy}
@@ -389,7 +394,6 @@ export default function AddMemoryScreen() {
             )}
           </Pressable>
         </View>
-      </ScrollView>
     </ScreenContainer>
   );
 }

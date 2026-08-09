@@ -9,7 +9,6 @@ const corsHeaders = {
 };
 
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY')!;
-const APP_URL = Deno.env.get('APP_URL') || 'https://kinos.family';
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -42,7 +41,7 @@ serve(async (req) => {
           <!-- Header -->
           <tr>
             <td style="background:#0F172A;padding:40px 32px;text-align:center;">
-              <p style="color:#F59E0B;font-size:13px;font-weight:700;letter-spacing:2px;margin:0 0 8px;">FAMILYOS™</p>
+              <p style="color:#F59E0B;font-size:13px;font-weight:700;letter-spacing:2px;margin:0 0 8px;">FAMBOUND</p>
               <h1 style="color:#fff;font-size:28px;font-weight:800;margin:0 0 8px;">Welcome to the Family 🏡</h1>
               <p style="color:#94A3B8;font-size:15px;margin:0;">The ${familyName} family is ready to go.</p>
             </td>
@@ -52,7 +51,7 @@ serve(async (req) => {
           <tr>
             <td style="padding:40px 32px;">
               <p style="color:#0F172A;font-size:16px;line-height:1.7;margin:0 0 24px;">
-                You've just set up your family's command centre. FamilyOS is your AI Chief of Staff — built to reduce the mental load, align your household, and help you build the family life you actually want.
+                You've just set up your family's command centre. Fambound is your AI Chief of Staff — built to reduce the mental load, align your household, and help you build the family life you actually want.
               </p>
 
               <p style="color:#0F172A;font-size:15px;font-weight:700;margin:0 0 12px;">Here's what to do next:</p>
@@ -83,21 +82,11 @@ serve(async (req) => {
             </td>
           </tr>
 
-          <!-- CTA -->
-          <tr>
-            <td style="padding:0 32px 40px;text-align:center;">
-              <a href="${APP_URL}" style="display:inline-block;background:#F59E0B;color:#fff;font-weight:700;font-size:15px;padding:16px 40px;border-radius:12px;text-decoration:none;">
-                Open FamilyOS →
-              </a>
-            </td>
-          </tr>
-
           <!-- Footer -->
           <tr>
             <td style="background:#F8FAFC;padding:20px 32px;text-align:center;border-top:1px solid #E2E8F0;">
               <p style="color:#94A3B8;font-size:12px;margin:0;">
-                FamilyOS™ · kinos.family<br/>
-                <a href="${APP_URL}/notification-preferences" style="color:#F59E0B;">Manage notification preferences</a>
+                Fambound™ · kinos.family<br/>
               </p>
             </td>
           </tr>
@@ -116,9 +105,9 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from: 'Avertune <info@avertune.com>',
+        from: 'Fambound <info@fambound.com>',
         to: [email],
-        subject: `Welcome to FamilyOS, ${familyName}! 🏡`,
+        subject: `Welcome to Fambound, ${familyName}! 🏡`,
         html,
       }),
     });

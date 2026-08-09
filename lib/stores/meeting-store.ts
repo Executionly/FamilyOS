@@ -1,6 +1,9 @@
 import { create } from 'zustand';
 import { supabase } from '@/lib/_core/supabase';
 import { notifyFamily } from '../services/notify';
+import { embedContent } from '../services/embed-content';
+import { useAuthStore } from './auth-store';
+import { useToastStore } from './toast-store';
 
 export interface Meeting {
   id: string;
@@ -9,9 +12,12 @@ export interface Meeting {
   description?: string;
   scheduled_date: string;
   duration_minutes: number;
+  occurrence: string;
+  meeting_link?: string;
   status: 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
   created_at: string;
   updated_at: string;
+  created_by?: string;
 }
 
 export interface MeetingAgenda {
@@ -54,6 +60,11 @@ interface MeetingState {
   fetchSummary: (meetingId: string) => Promise<void>;
   createSummary: (meetingId: string, summary: Omit<MeetingSummary, 'id' | 'created_at'>) => Promise<void>;
   setError: (error: string | null) => void;
+
+  channel: ReturnType<typeof supabase.channel> | null;
+  subscribeToRealtime: (familyId: string) => void;
+  unsubscribeFromRealtime: () => void;
+
 }
 
 export const useMeetingStore = create<MeetingState>((set, get) => ({
@@ -63,6 +74,54 @@ export const useMeetingStore = create<MeetingState>((set, get) => ({
   summary: null,
   loading: false,
   error: null,
+
+  channel: null,
+
+  subscribeToRealtime: (familyId: string) => {
+    const channel = supabase
+      .channel(`meetings-${familyId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'meeting', filter: `family_id=eq.${familyId}` },
+        (payload) => {
+          if (payload.eventType === 'INSERT') {
+            const newMeeting = payload.new as Meeting;
+            const currentUserId = useAuthStore.getState().user?.id;
+
+            set((state) => {
+              if (state.meetings.some((m) => m.id === newMeeting.id)) return state;
+              return { meetings: [newMeeting, ...state.meetings] };
+            });
+
+            if (newMeeting?.created_by === currentUserId) return; // don't toast yourself
+
+            useToastStore.getState().showToast({
+              title: 'New meeting scheduled',
+              body: newMeeting.title,
+              variant: 'info',
+              actionRoute: '/meetings/setup',
+            });
+          } else if (payload.eventType === 'UPDATE') {
+            set((state) => ({
+              meetings: state.meetings.map((m) => (m.id === payload.new.id ? (payload.new as Meeting) : m)),
+            }));
+          } else if (payload.eventType === 'DELETE') {
+            set((state) => ({
+              meetings: state.meetings.filter((m) => m.id !== payload.old.id),
+            }));
+          }
+        }
+      )
+      .subscribe();
+
+    set({ channel });
+  },
+
+  unsubscribeFromRealtime: () => {
+    const { channel } = get();
+    if (channel) supabase.removeChannel(channel);
+    set({ channel: null });
+  },
 
   fetchMeetings: async (familyId: string) => {
     set({ loading: true });
@@ -162,6 +221,13 @@ export const useMeetingStore = create<MeetingState>((set, get) => ({
           body: `"${data.title}" has been completed. Check the summary for key decisions.`,
           actionLabel: 'View Summary',
           actionRoute: '/(tabs)/meetings',
+        });
+
+        embedContent({
+          family_id: data.family_id,
+          source_type: 'meeting',
+          source_id: meetingId,
+          content: data.description,
         });
       }
     } catch (error) {

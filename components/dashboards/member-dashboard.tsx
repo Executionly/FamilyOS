@@ -1,0 +1,316 @@
+import React, { useEffect, useState } from 'react';
+import { ScrollView, Text, View, Pressable, ActivityIndicator, Linking, RefreshControl } from 'react-native';
+import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { ScreenContainer } from '@/components/screen-container';
+import { useColors } from '@/hooks/use-colors';
+import { useFamilyStore } from '@/lib/stores/family-store';
+import { useMeetingStore } from '@/lib/stores/meeting-store';
+import { useCommitmentStore } from '@/lib/stores/commitment-store';
+import { useCalendarStore } from '@/lib/stores/calendar-store';
+import { useChoreStore } from '@/lib/stores/chore-store';
+import { NotificationBell } from '@/components/Notification-Bell';
+import { FamilyChatFab } from '@/components/family-chat-fab';
+import { useNotificationStore } from '@/lib/stores/notification-store';
+import { useAuthStore } from '@/lib/stores/auth-store';
+
+function StatCard({
+  icon, label, value, sub,
+}: {
+  icon: keyof typeof Ionicons.glyphMap; label: string; value: string | number; sub?: string;
+}) {
+  return (
+    <View className="flex-1 rounded-2xl border border-border bg-surface p-3.5">
+      <Ionicons name={icon} size={20} color="#0a7ea4" />
+      <Text className="mt-1.5 text-xl font-extrabold text-primary">{value}</Text>
+      <Text className="mt-0.5 text-[11px] font-semibold text-foreground">{label}</Text>
+      {sub ? <Text className="mt-0.5 text-[10px] text-muted">{sub}</Text> : null}
+    </View>
+  );
+}
+
+function SectionHeader({ title, action, onAction }: { title: string; action?: string; onAction?: () => void }) {
+  return (
+    <View className="mb-2.5 flex-row items-center justify-between">
+      <Text className="text-[15px] font-bold text-foreground">{title}</Text>
+      {action && (
+        <Pressable onPress={onAction}>
+          <Text className="text-xs font-semibold text-primary">{action}</Text>
+        </Pressable>
+      )}
+    </View>
+  );
+}
+
+export function MemberDashboard() {
+  const router = useRouter();
+  const colors = useColors();
+  const { family, currentMember } = useFamilyStore();
+  const { meetings, fetchMeetings } = useMeetingStore();
+  const { commitments, fetchCommitments, updateCommitment } = useCommitmentStore();
+  const { events, fetchEvents } = useCalendarStore();
+  const { chores, fetchChores, updateChore } = useChoreStore();
+  const {unreadCount,fetchNotifications} = useNotificationStore()
+  const [loading, setLoading] = useState(true);
+
+
+  const handleFetch = () => {
+    if(!family?.id) return
+    setLoading(true)
+    try {
+      Promise.all([
+        fetchMeetings(family.id),
+        fetchCommitments(family.id),
+        fetchEvents(family.id),
+        fetchChores(family.id),
+        fetchNotifications(family.id),
+        unreadCount()
+      ]);
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    handleFetch()
+  }, [family?.id]);
+
+  const now = new Date();
+  const isSameDay = (a: Date, b: Date) =>
+    a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+
+  const myChores = chores.filter((c) => c.assigned_to === currentMember?.id);
+  const myCommitments = commitments.filter((c) => c.assigned_to === currentMember?.id);
+  const myOpenChores = myChores.filter((c) => c.status !== 'completed');
+  const myOpenCommitments = myCommitments.filter((c) => c.status === 'open');
+  const todayEvents = events.filter((e) => isSameDay(new Date(e.start_date), now));
+  const nextMeeting = meetings.find((m) => m.status === 'scheduled');
+
+  const focusItem = [...myOpenChores, ...myOpenCommitments]
+    .filter((i) => i.due_date)
+    .sort((a, b) => new Date(a.due_date!).getTime() - new Date(b.due_date!).getTime())[0]
+    ?? [...myOpenChores, ...myOpenCommitments][0];
+
+  const isFocusChore = focusItem && myOpenChores.some((c) => c.id === focusItem.id);
+
+  const greeting = () => {
+    const h = now.getHours();
+    if (h < 12) return 'Good morning';
+    if (h < 17) return 'Good afternoon';
+    return 'Good evening';
+  };
+
+  const handleFocusComplete = async () => {
+    if (!focusItem) return;
+    try {
+      if (isFocusChore) await updateChore(focusItem.id, { status: 'completed' });
+      else await updateCommitment(focusItem.id, { status: 'completed' });
+    } catch (err) {
+      console.error('Failed to complete focus item:', err);
+    }
+  };
+
+  const handleChoreComplete = async (id: string) => {
+    try { await updateChore(id, { status: 'completed' }); } catch (err) { console.error(err); }
+  };
+  const handleCommitmentComplete = async (id: string) => {
+    try { await updateCommitment(id, { status: 'completed' }); } catch (err) { console.error(err); }
+  };
+
+  if (loading) {
+    return (
+      <ScreenContainer containerClassName="bg-background" safeAreaClassName="bg-background">
+        <View className="flex-1 items-center justify-center">
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text className="mt-3 text-sm text-muted">Loading your dashboard...</Text>
+        </View>
+      </ScreenContainer>
+    );
+  }
+
+  return (
+    <ScreenContainer containerClassName="bg-background" safeAreaClassName="bg-background">
+      <ScrollView 
+      contentContainerStyle={{ paddingBottom: 40 }} 
+      showsVerticalScrollIndicator={false}
+      refreshControl={<RefreshControl refreshing={loading} onRefresh={handleFetch}/>}
+      >
+        {/* ── Header ─────────────────────────────────────── */}
+        <View className="bg-primary px-6 pb-8 pt-5">
+          <View className="flex-row items-start justify-between">
+            <View className="flex-1">
+              <Text className="text-[13px] font-medium text-white/75">
+                {now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+              </Text>
+              <Text className="mt-1 text-2xl font-extrabold leading-8 text-white">
+                {greeting()}, {currentMember?.name?.split(' ')[0]} 👋
+              </Text>
+            </View>
+            <NotificationBell />
+          </View>
+
+          {/* Next meeting pill */}
+          <Pressable
+            onPress={() => router.push('/meetings/setup')}
+            className="mt-4 flex-row items-center justify-between rounded-xl bg-white/15 px-3.5 py-2.5"
+          >
+            <View className="flex-row items-center gap-2">
+              <Ionicons name="calendar-outline" size={18} color="#fff" />
+              <Text className="text-[13px] text-white/85">
+                {nextMeeting
+                  ? `Next meeting · ${new Date(nextMeeting.scheduled_date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}`
+                  : 'No meeting scheduled'}
+              </Text>
+            </View>
+            <View className="rounded-md bg-white px-2.5 py-1">
+              <Text className="text-[11px] font-bold text-primary">{nextMeeting ? 'View' : 'Schedule'}</Text>
+            </View>
+          </Pressable>
+        </View>
+
+        <View className="-mt-3 px-5">
+          {/* ── Focus Card ──────────────────────────────── */}
+          {focusItem ? (
+            <View className="mb-4 rounded-2xl border border-border bg-surface p-5 shadow-sm">
+              <Text className="text-[11px] font-bold tracking-wide text-primary">
+                {isFocusChore ? 'NEXT CHORE' : 'NEXT COMMITMENT'}
+              </Text>
+              <Text className="mt-2 text-lg font-bold leading-6 text-foreground">{focusItem.title}</Text>
+              {focusItem.due_date && (
+                <Text className="mt-1.5 text-[13px] text-muted">
+                  Due {new Date(focusItem.due_date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                </Text>
+              )}
+              <Pressable
+                onPress={handleFocusComplete}
+                className="mt-4 self-start rounded-xl bg-primary px-4.5 py-2.5"
+              >
+                <Text className="text-[13px] font-bold text-white">Mark Done</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <View className="mb-4 items-center rounded-2xl border border-emerald-200 bg-emerald-50 p-6">
+              <Ionicons name="sparkles-outline" size={24} color="#22C55E" />
+              <Text className="mt-2 text-base font-bold text-emerald-700">You're all caught up!</Text>
+              <Text className="mt-1 text-xs text-emerald-600">No pending chores or commitments</Text>
+            </View>
+          )}
+
+          {/* ── Stat cards ──────────────────────────────── */}
+          <View className="mb-4 flex-row gap-2.5">
+            <StatCard icon="checkmark-circle-outline" label="Open Tasks" value={myOpenCommitments.length + myOpenChores.length} sub={myOpenCommitments.length + myOpenChores.length === 0 ? 'All clear' : undefined} />
+            <StatCard icon="calendar-clear-outline" label="Today's Events" value={todayEvents.length} />
+            <StatCard icon="construct-outline" label="Chores Due" value={myOpenChores.length} />
+          </View>
+
+          {/* ── My Commitments ──────────────────────────── */}
+          {myOpenCommitments.length > 0 && (
+            <View className="mb-4">
+              <SectionHeader title="My Commitments" />
+              <View className="rounded-2xl border border-border bg-surface">
+                {myOpenCommitments.map((item, i) => (
+                  <View key={item.id} className={`flex-row items-center p-3.5 ${i > 0 ? 'border-t border-border' : ''}`}>
+                    <View className="flex-1">
+                      <Text className="text-[13px] font-semibold text-foreground">{item.title}</Text>
+                      {item.due_date && (
+                        <Text className="mt-0.5 text-[11px] text-muted">
+                          Due {new Date(item.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                        </Text>
+                      )}
+                    </View>
+                    <Pressable onPress={() => handleCommitmentComplete(item.id)} hitSlop={8}>
+                      <Ionicons name="ellipse-outline" size={22} color={colors.muted} />
+                    </Pressable>
+                  </View>
+                ))}
+              </View>
+            </View>
+          )}
+
+          {/* ── My Chores ───────────────────────────────── */}
+          {myOpenChores.length > 0 && (
+            <View className="mb-4">
+              <SectionHeader title="My Chores" action="View all" onAction={() => router.push('/(stack)/chores')} />
+              <View className="rounded-2xl border border-border bg-surface">
+                {myOpenChores.map((item, i) => (
+                  <View key={item.id} className={`flex-row items-center p-3.5 ${i > 0 ? 'border-t border-border' : ''}`}>
+                    <Text className="mr-2.5 text-lg">🧹</Text>
+                    <Text className="flex-1 text-[13px] font-semibold text-foreground">{item.title}</Text>
+                    <Pressable
+                      onPress={() => handleChoreComplete(item.id)}
+                      className="rounded-lg bg-emerald-500 px-3 py-1.5"
+                    >
+                      <Text className="text-xs font-bold text-white">Done ✓</Text>
+                    </Pressable>
+                  </View>
+                ))}
+              </View>
+            </View>
+          )}
+
+          {/* ── Today's Family Events ───────────────────── */}
+          {todayEvents.length > 0 && (
+            <View className="mb-4">
+              <SectionHeader title="Today's Family Events" action="Calendar" onAction={() => router.push('/(stack)/calendar')} />
+              <View className="rounded-2xl border border-border bg-surface">
+                {todayEvents.map((item, i) => (
+                  <View key={item.id} className={`flex-row items-center p-3.5 ${i > 0 ? 'border-t border-border' : ''}`}>
+                    <View className="mr-3 h-8 w-1 rounded-full bg-primary" style={item.color ? { backgroundColor: item.color } : undefined} />
+                    <View className="flex-1">
+                      <Text className="text-[13px] font-semibold text-foreground">{item.title}</Text>
+                      <Text className="mt-0.5 text-[11px] text-muted">
+                        {new Date(item.start_date).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                        {item.location ? ` · ${item.location}` : ''}
+                      </Text>
+                    </View>
+                    <Text className="text-lg">📅</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          )}
+
+          {/* ── Empty state ─────────────────────────────── */}
+          {myOpenCommitments.length === 0 && myOpenChores.length === 0 && todayEvents.length === 0 && (
+            <View className="mb-4 items-center rounded-2xl border border-emerald-200 bg-emerald-50 p-6">
+              <Ionicons name="sparkles-outline" size={24} color="#4ADE80" />
+              <Text className="text-center text-base font-bold text-emerald-700">All caught up!</Text>
+              <Text className="mt-1 text-center text-[13px] text-emerald-600">
+                No open tasks, events, or chores today.
+              </Text>
+            </View>
+          )}
+
+          {/* ── Quick Actions ────────────────────────────── */}
+          <View className="mb-2 rounded-2xl border border-border bg-surface p-4">
+            <SectionHeader title="Quick Actions" />
+            <View className="flex-row gap-2.5">
+              <Pressable
+                onPress={() => router.push('/meal')}
+                className="flex-1 items-center gap-1 rounded-xl border border-sky-200 bg-sky-50 py-3.5"
+              >
+                <Ionicons name="restaurant-outline" size={22} color="#0369A1" />
+                <Text className="text-xs font-semibold text-sky-700">Meals</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => router.push('/(stack)/chores')}
+                className="flex-1 items-center gap-1 rounded-xl border border-emerald-200 bg-emerald-50 py-3.5"
+              >
+                <Ionicons name="construct-outline" size={22} color="#15803D" />
+                <Text className="text-xs font-semibold text-emerald-700">Chores</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => router.push('/(stack)/calendar')}
+                className="flex-1 items-center gap-1 rounded-xl bg-primary py-3.5"
+              >
+                <Ionicons name="calendar-outline" size={22} color="#fff" />
+                <Text className="text-xs font-bold text-white">Calendar</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </ScrollView>
+      <FamilyChatFab />
+    </ScreenContainer>
+  );
+}

@@ -6,15 +6,19 @@ import { useColors } from '@/hooks/use-colors';
 import { useMeetingStore } from '@/lib/stores/meeting-store';
 import { useCommitmentStore } from '@/lib/stores/commitment-store';
 import { AppHeader } from '@/components/app-header';
+import { useFamilyStore } from '@/lib/stores/family-store';
 
 export default function MeetingSummaryScreen() {
   const router = useRouter();
   const colors = useColors();
   const { meetingId } = useLocalSearchParams();
+  const {members} = useFamilyStore()
   const { currentMeeting, summary, fetchMeeting, fetchSummary } = useMeetingStore();
   const { commitments, fetchCommitments } = useCommitmentStore();
 
   const [loading, setLoading] = useState(true);
+
+  const memberName = (id?: string | null) => members?.find((m) => m.id === id)?.name ?? null;
 
   useEffect(() => {
     if (meetingId && typeof meetingId === 'string') {
@@ -51,7 +55,7 @@ export default function MeetingSummaryScreen() {
   };
 
   const handleDone = () => {
-    router.push('/meetings');
+    router.replace('/meetings');
   };
 
   if (loading) {
@@ -130,7 +134,7 @@ export default function MeetingSummaryScreen() {
                   <View className="mb-2 p-3 rounded-lg border border-border" style={{ backgroundColor: colors.surface }}>
                     <Text className="font-semibold text-foreground">{item.title}</Text>
                     {item.assigned_to && (
-                      <Text className="text-sm text-muted mt-1">Assigned to: {item.assigned_to}</Text>
+                      <Text className="text-sm text-muted mt-1">Assigned to: {memberName(item.assigned_to)}</Text>
                     )}
                   </View>
                 )}
@@ -149,13 +153,13 @@ export default function MeetingSummaryScreen() {
         >
           <Text className="text-foreground font-semibold">Share Summary</Text>
         </Pressable>
-        {/* <Pressable
+        <Pressable
           onPress={handleDone}
           className="py-3 px-4 rounded-lg items-center"
           style={{ backgroundColor: colors.primary }}
         >
           <Text className="text-white font-semibold">Done</Text>
-        </Pressable> */}
+        </Pressable>
       </View>
     </ScreenContainer>
   );

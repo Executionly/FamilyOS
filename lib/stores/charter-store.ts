@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { supabase } from '@/lib/_core/supabase';
+import { embedContent } from '../services/embed-content';
 
 export interface Charter {
   id: string;
@@ -98,6 +99,13 @@ export const useCharterStore = create<CharterState>((set, get) => ({
       if (error) throw error;
 
       set({ charter: data, error: null });
+
+      embedContent({
+        family_id: familyId,
+        source_type: 'charter',
+        source_id: data.id,
+        content: `Vision\n\n${charter.vision}\n\nMission\n\n${charter.mission}\n\nConstitution\n\n${charter.constitution}\n\nValues\n\n${charter.values}`,
+      });
       return data;
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to create charter';

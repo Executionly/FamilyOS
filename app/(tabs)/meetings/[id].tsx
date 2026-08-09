@@ -5,14 +5,18 @@ import { ScreenContainer } from '@/components/screen-container';
 import { useColors } from '@/hooks/use-colors';
 import { useMeetingStore } from '@/lib/stores/meeting-store';
 import { AppHeader } from '@/components/app-header';
+import { useFamilyStore } from '@/lib/stores/family-store';
+import { isAdminAccess } from '@/utils';
 
 export default function MeetingDetailScreen() {
   const router = useRouter();
   const colors = useColors();
   const { id } = useLocalSearchParams();
   const { currentMeeting, agendaItems, summary, fetchMeeting, fetchAgenda, fetchSummary, deleteMeeting } = useMeetingStore();
-
+  const {currentMember} = useFamilyStore()
   const [loading, setLoading] = useState(true);
+
+  const isEditor = isAdminAccess(currentMember?.role)
 
   useEffect(() => {
     if (id && typeof id === 'string') {
@@ -172,8 +176,8 @@ export default function MeetingDetailScreen() {
       </ScrollView>
 
       {/* Delete Button */}
-      <View className="px-6 pb-8 flex-row items-center">
-        {currentMeeting.status === 'scheduled' && (
+      <View className="px-6 pb-5 flex-row items-center">
+        {currentMeeting.status === 'scheduled' && isEditor && (
           <Pressable
             onPress={() => router.push(`/meetings/run?meetingId=${currentMeeting.id}`)}
             className="py-3 px-4 flex-1 rounded-lg items-center mr-2 text-white"
@@ -192,13 +196,13 @@ export default function MeetingDetailScreen() {
             <Text>View Summary</Text>
           </Pressable>
         )}
-        <Pressable
+        {isEditor && <Pressable
           onPress={handleDelete}
           className="py-3 px-4 rounded-lg items-center border border-red-300 flex-1"
           style={{ backgroundColor: '#FEE2E2' }}
         >
           <Text className="text-red-700 font-semibold">Delete Meeting</Text>
-        </Pressable>
+        </Pressable>}
       </View>
     </ScreenContainer>
   );

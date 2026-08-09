@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { supabase } from '@/lib/_core/supabase';
+import { embedContent } from '../services/embed-content';
 
 export interface TimelineEvent {
   id: string;
@@ -51,6 +52,12 @@ export const useTimelineStore = create<TimelineState>((set, get) => ({
         .single();
       if (error) throw error;
       set((state) => ({ events: [data, ...state.events].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()), error: null }));
+      embedContent({
+        family_id: data.family_id,
+        source_type: 'timeline_event',
+        source_id: data.id,
+        content: `Timeline event: ${data.title}. ${data.description ?? ''} Dated ${new Date(data.date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}.`,
+      });
       return data;
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to create timeline event';

@@ -7,53 +7,48 @@ import { useAuthStore } from '@/lib/stores/auth-store';
 import { useOnboardingStore } from '@/lib/stores/onboarding-store';
 import '@/global.css';
 import { usePushNotifications } from '@/hooks/use-push-notification';
+import { useFonts, SpaceGrotesk_700Bold, SpaceGrotesk_500Medium } from '@expo-google-fonts/space-grotesk';
+import { Inter_400Regular, Inter_500Medium, Inter_600SemiBold } from '@expo-google-fonts/inter';
+import { ToastHost } from '@/components/ToastHost';
+import { BriefingModal } from '@/components/briefing-modal';
+
 
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   usePushNotifications()
-  const fontsLoaded = true;
-
-  const { initialize, isAuthenticated, loading: authLoading } = useAuthStore();
-  const { isCompleted: onboardingCompleted } = useOnboardingStore();
-
-  useEffect(() => {
-    initialize();
-    console.log("INItialiazed")
-  }, [initialize]);
+    const [fontsLoaded] = useFonts({
+    SpaceGrotesk_700Bold, SpaceGrotesk_500Medium,
+    Inter_400Regular, Inter_500Medium, Inter_600SemiBold,
+  });
 
   useEffect(() => {
-    if (!authLoading) {
-      SplashScreen.hideAsync();
+    if (fontsLoaded) {
+      SplashScreen.hideAsync().catch(() => {
+      });
     }
-  }, [authLoading]);
+  }, [fontsLoaded]);
 
-  if (!fontsLoaded || authLoading) {
+
+  if (!fontsLoaded) {
     return null;
   }
   return (
       <GestureHandlerRootView style={{ flex: 1 }}>
         <ThemeProvider>
+          <ToastHost />
+          <BriefingModal />
           <Stack
             screenOptions={{
               headerShown: false,
             }}
           >
-            {!isAuthenticated ? (
-              // Auth Stack
-              <Stack.Screen name="(auth)" />
-            // ) : !onboardingCompleted ? (
-            //   // Onboarding Stack
-            //   <Stack.Screen name="(onboarding)" />
-          ) : (
-            // Main App Stack
+            <Stack.Screen name="index" />
+            <Stack.Screen name="get-started" />
+            <Stack.Screen name="(auth)" />
             <Stack.Screen name="(tabs)" />
-          )}
-
             <Stack.Screen name="(onboarding)" />
             <Stack.Screen name="(stack)" />
-            {/* OAuth Callback */}
-            <Stack.Screen name="oauth/callback" options={{ headerShown: false }} />
           </Stack>
         </ThemeProvider>
       </GestureHandlerRootView>

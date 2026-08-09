@@ -1,4 +1,4 @@
-import { ScrollView, Text, View, Pressable, ActivityIndicator, FlatList, Image, TouchableOpacity } from 'react-native';
+import { ScrollView, Text, View, Pressable, ActivityIndicator, FlatList, Image, TouchableOpacity, RefreshControl } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ScreenContainer } from '@/components/screen-container';
@@ -44,13 +44,20 @@ export default function LegacyScreen() {
   const { stories, loading: storiesLoading, error: storiesError, fetchStories } = useStoriesStore();
   const { events: timelineEvents, loading: timelineLoading, fetchTimeline } = useTimelineStore();
   const [activeTab, setActiveTab] = useState<'vault' | 'stories' | 'timeline'>('vault');
+  const [refreshing, setRefreshing] = useState(false)
 
   const handleFetch = () => {
     if(!family?.id) return
-    fetchMemories(family.id);
-    fetchStories(family.id);
-    fetchTimeline(family.id);
+    setRefreshing(true)
+    try {
+      fetchMemories(family.id);
+      fetchStories(family.id);
+      fetchTimeline(family.id);
+    } finally {
+      setRefreshing(false)
+    }
   }
+  
   useEffect(() => {
     if (family?.id) {
       handleFetch()
@@ -85,39 +92,15 @@ export default function LegacyScreen() {
     );
   }
 
-  if (memories.length === 0 && stories.length === 0) {
-      return (
-          <ScreenContainer containerClassName="bg-background" safeAreaClassName="bg-background">
-            <View className='flex-row items-center justify-between'>
-              <Text className="text-2xl font-bold text-foreground mb-6">Family Legacy</Text>
-              <TouchableOpacity
-              onPress={handleFetch}
-              >
-                <MaterialIcons name="refresh" size={24} color="black" />
-              </TouchableOpacity>
-            </View>
-          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 }}>
-              <Ionicons name="image-outline" size={48} color={colors.muted} />
-              <Text style={{ color: colors.muted, marginTop: 12, textAlign: 'center' }}>
-                No memories found.
-              </Text>
-          </View>
-          </ScreenContainer>
-      );
-  }
-console.log("memories", memories)
   return (
     <ScreenContainer containerClassName="bg-background" safeAreaClassName="bg-background">
-      <ScrollView contentContainerStyle={{ flexGrow: 1 }} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+      contentContainerStyle={{ flexGrow: 1 }} 
+      showsVerticalScrollIndicator={false}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleFetch} />}
+      >
         <View className="flex-1 px-6 py-2">
-          <View className='flex-row items-center justify-between'>
-            <Text className="text-2xl font-bold text-foreground mb-6">Family Legacy</Text>
-            <TouchableOpacity
-            onPress={handleFetch}
-            >
-              {loading ? <ActivityIndicator size={"small"}/> : <MaterialIcons name="refresh" size={24} color="black" />}
-            </TouchableOpacity>
-          </View>
+          <Text className="text-2xl font-bold text-foreground mb-6 text-center">Family Legacy</Text>
 
           {/* Tab Navigation */}
           <View className="flex-row mb-6 gap-2">

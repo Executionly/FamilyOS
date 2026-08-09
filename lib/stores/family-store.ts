@@ -1,5 +1,7 @@
 import { create } from 'zustand';
 import { supabase } from '@/lib/_core/supabase';
+import { embedContent } from '../services/embed-content';
+import { notifyMember } from '../services/notify';
 
 export type MemberRole = 'admin' | 'coparent' | 'member' | 'child' | string;
 export type AgeBand = 'toddler' | 'child' | 'preteen' | 'teen' | 'adult' | string;
@@ -12,6 +14,9 @@ export interface Member {
   age_band?: AgeBand;
   has_login?: boolean;
   user_id?: string;
+  avatar_url?: string;
+  signup_code?: string;
+  is_founding_admin?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -24,12 +29,14 @@ export interface Family {
   subscription_status: 'free' | 'premium';
   created_at: string;
   updated_at: string;
+  image_url?: string;
 }
 
 interface FamilyState {
   // State
   family: Family | null;
   members: Member[];
+  currentMember: Member | null;
   loading: boolean;
   error: string | null;
 
@@ -42,6 +49,13 @@ interface FamilyState {
   addMember: (familyId: string, member: Omit<Member, 'id' | 'family_id' | 'created_at' | 'updated_at'>) => Promise<void>;
   updateMember: (memberId: string, updates: Partial<Member>) => Promise<void>;
   removeMember: (memberId: string) => Promise<void>;
+  uploadAvatar: (memberId: string, fileUri: string, mimeType: string, fileName: string) => Promise<Family>;
+  getAvatarSignedUrl: (storagePath: string) => Promise<string | null>;
+  uploadFamilyPhoto: (memberId: string, fileUri: string, mimeType: string, fileName: string) => Promise<Family>;
+  getFamilyPhotoSignedUrl: (storagePath: string) => Promise<string | null>;
+  updateFamilyName: (familyId: string,name: string) => Promise<void>;
+  promoteMember: (memberId: string,familyId: string) => Promise<void>;
+  demoteMember: (memberId: string,familyId: string) => Promise<void>;
   setError: (error: string | null) => void;
   
 }
@@ -49,6 +63,7 @@ interface FamilyState {
 export const useFamilyStore = create<FamilyState>((set, get) => ({
   family: null,
   members: [],
+  currentMember: null,
   loading: false,
   error: null,
 
@@ -75,6 +90,7 @@ export const useFamilyStore = create<FamilyState>((set, get) => ({
         .order('created_at', { ascending: false })
         .limit(1);
 
+        
       if (ownedError) throw ownedError;
 
       familyId = ownedFamilies?.[0]?.id ?? null;
@@ -94,10 +110,12 @@ export const useFamilyStore = create<FamilyState>((set, get) => ({
       if (familyError) throw familyError;
       if (membersError) throw membersError;
 
-      set({ family, members: members || [], error: null });
+      const { data: { user } } = await supabase.auth.getUser();
+      const currentMember = members?.find((m) => m.user_id === user?.id) ?? null;
+
+      set({ family, members: members || [],currentMember, error: null });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to fetch family for user';
-      console.error('[FamilyStore] fetchFamilyForUser error:', error);
       set({ error: message });
     } finally {
       set({ loading: false });
@@ -114,7 +132,7 @@ export const useFamilyStore = create<FamilyState>((set, get) => ({
         .single();
 
       if (error) throw error;
-console.log('Fetched family:', data);
+
       set({ family: data, error: null });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to fetch family';
@@ -221,6 +239,12 @@ console.log('Fetched family:', data);
         members: [...state.members, data],
         error: null,
       }));
+      embedContent({
+        family_id: familyId,
+        source_type: 'member',
+        source_id: data.id,
+        content: `Family member: ${data.name}, role: ${data.role}${data.age_band ? `, age group: ${data.age_band}` : ''}.`,
+      });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to add member';
       set({ error: message });
@@ -271,6 +295,187 @@ console.log('Fetched family:', data);
       }));
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to remove member';
+      set({ error: message });
+      throw error;
+    } finally {
+      set({ loading: false });
+    }
+  },
+
+  uploadAvatar: async (memberId: string, fileUri: string, mimeType: string, fileName: string) => {
+    set({ loading: true, error: null });
+    try {
+      const storagePath = `${memberId}/${Date.now()}_${fileName}`;
+
+      const formData = new FormData();
+      formData.append('file', {
+        uri: fileUri,
+        name: fileName,
+        type: mimeType,
+      } as any);
+
+      const { error: uploadError } = await supabase.storage
+        .from('member-avatars')
+        .upload(storagePath, formData, { contentType: mimeType, upsert: false });
+      if (uploadError) throw uploadError;
+
+      const { data, error } = await supabase
+        .from('member')
+        .update({ avatar_url: storagePath })
+        .eq('id', memberId)
+        .select()
+        .single();
+      if (error) throw error;
+
+      // Update local state so it reflects immediately
+      set((state) => ({
+        members: state.members.map((m) => (m.id === memberId ? { ...m, avatar_url: storagePath } : m)),
+        currentMember: state.currentMember?.id === memberId ? { ...state.currentMember, avatar_url: storagePath } : state.currentMember,
+        error: null,
+      }));
+
+      return data;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to upload avatar';
+      set({ error: message });
+      throw error;
+    } finally {
+      set({ loading: false });
+    }
+  },
+
+  getAvatarSignedUrl: async (storagePath: string) => {
+    try {
+      const { data, error } = await supabase.storage
+        .from('member-avatars')
+        .createSignedUrl(storagePath, 60 * 60 * 24 * 7); // 7 days — avatars are viewed constantly, no need to re-resolve often
+      if (error) throw error;
+      return data.signedUrl;
+    } catch {
+      return null;
+    }
+  },
+
+  uploadFamilyPhoto: async (familyId: string, fileUri: string, mimeType: string, fileName: string) => {
+    set({ loading: true, error: null });
+    try {
+      const storagePath = `${familyId}/${Date.now()}_${fileName}`;
+
+      const formData = new FormData();
+      formData.append('file', { uri: fileUri, name: fileName, type: mimeType } as any);
+
+      const { error: uploadError } = await supabase.storage
+        .from('family-photos')
+        .upload(storagePath, formData, { contentType: mimeType, upsert: false });
+      if (uploadError) throw uploadError;
+
+      const { data, error } = await supabase
+        .from('family')
+        .update({ photo_url: storagePath })
+        .eq('id', familyId)
+        .select()
+        .single();
+      if (error) throw error;
+
+      set((state) => ({ family: state.family ? { ...state.family, photo_url: storagePath } : state.family, error: null }));
+      return data;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to upload family photo';
+      set({ error: message });
+      throw error;
+    } finally {
+      set({ loading: false });
+    }
+  },
+
+  getFamilyPhotoSignedUrl: async (storagePath: string) => {
+    try {
+      const { data, error } = await supabase.storage
+        .from('family-photos')
+        .createSignedUrl(storagePath, 60 * 60 * 24 * 7);
+      if (error) throw error;
+      return data.signedUrl;
+    } catch {
+      return null;
+    }
+  },
+
+  updateFamilyName: async (familyId: string, name: string) => {
+    set({ loading: true, error: null });
+    try {
+      const { data, error } = await supabase
+        .from('family')
+        .update({ name })
+        .eq('id', familyId)
+        .select()
+        .single();
+      if (error) throw error;
+
+      set((state) => ({ family: state.family ? { ...state.family, name } : state.family, error: null }));
+      return data;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to update family name';
+      set({ error: message });
+      throw error;
+    } finally {
+      set({ loading: false });
+    }
+  },
+
+  promoteMember: async (memberId: string, familyId: string) => {
+    set({ loading: true, error: null });
+    try {
+      const { data, error } = await supabase
+        .from('member')
+        .update({ role: 'admin' })
+        .eq('id', memberId)
+        .select()
+        .single();
+      if (error) throw error;
+
+      set((state) => ({
+        members: state.members.map((m) => (m.id === memberId ? { ...m, role: 'admin' } : m)),
+        error: null,
+      }));
+
+      await notifyMember(memberId, {
+        familyId,
+        type: 'family_update',
+        priority: 'important',
+        title: "You're now a family admin",
+        body: 'You can now manage chores, meals, calendar, and members for your family.',
+        actionRoute: '/(tabs)',
+      });
+
+      return data;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to promote member';
+      set({ error: message });
+      throw error;
+    } finally {
+      set({ loading: false });
+    }
+  },
+
+  demoteMember: async (memberId: string, familyId: string) => {
+    set({ loading: true, error: null });
+    try {
+      const { data, error } = await supabase
+        .from('member')
+        .update({ role: 'member' })
+        .eq('id', memberId)
+        .select()
+        .single();
+      if (error) throw error; // will throw the trigger's exception if this is the founder
+
+      set((state) => ({
+        members: state.members.map((m) => (m.id === memberId ? { ...m, role: 'member' } : m)),
+        error: null,
+      }));
+
+      return data;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to update member role';
       set({ error: message });
       throw error;
     } finally {

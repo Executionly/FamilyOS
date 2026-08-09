@@ -47,7 +47,7 @@ export default function WelcomeScreen() {
           <View className="mb-10 items-center">
             <Text className="text-6xl mb-4">🏡</Text>
             <Text className="text-4xl font-bold text-foreground mb-3 text-center">
-              Welcome to FamilyOS™
+              Welcome to Fambound™
             </Text>
             <Text className="text-base text-muted text-center leading-relaxed">
               Your AI Chief of Staff for the whole household. Let's start by giving your family a name.
@@ -67,7 +67,7 @@ export default function WelcomeScreen() {
               Family Name
             </Text>
             <TextInput
-              placeholder="e.g. The Johnson Family"
+              placeholder="e.g. The Johnson"
               placeholderTextColor={colors.muted}
               value={name}
               onChangeText={setName}

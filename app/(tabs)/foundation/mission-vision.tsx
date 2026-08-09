@@ -6,6 +6,7 @@ import { useCharterStore } from '@/lib/stores/charter-store';
 import { useColors } from '@/hooks/use-colors';
 import { generateMissionVision } from '@/lib/services/charter-ai';
 import { useFamilyStore } from '@/lib/stores/family-store';
+import { AppHeader } from '@/components/app-header';
 
 export default function MissionVisionScreen() {
   const router = useRouter();
@@ -41,6 +42,7 @@ export default function MissionVisionScreen() {
 
   return (
     <ScreenContainer containerClassName="bg-background" safeAreaClassName="bg-background">
+      <AppHeader title="Mission & Vision" showBack />
       <ScrollView
         contentContainerStyle={{ flexGrow: 1 }}
         showsVerticalScrollIndicator={false}

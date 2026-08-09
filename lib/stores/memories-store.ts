@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { supabase } from '@/lib/_core/supabase';
 import { notifyAssignment, notifyFamily } from '../services/notify';
+import { embedContent } from '../services/embed-content';
 
 
 export interface Memory {
@@ -132,6 +133,14 @@ export const useMemoriesStore = create<MemoriesState>((set) => ({
             actionRoute: '/(tabs)/legacy',
           });
         }
+      }
+      if (memory.caption?.trim()) {
+        embedContent({
+          family_id: data.family_id,
+          source_type: 'memory',
+          source_id: data.id,
+          content: data.caption,
+        });
       }
       return data;
     } catch (error) {

@@ -4,12 +4,17 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { ScreenContainer } from '@/components/screen-container';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { useColors } from '@/hooks/use-colors';
+import { supabase } from '@/lib/_core/supabase';
+import { notifyAdmins } from '@/lib/services/notify';
+
+
+type VerifyMode = "signup" | "reset-password" | "join-family";
 
 export default function VerifyEmailScreen() {
   const router = useRouter();
   const colors = useColors();
-  const { email: paramEmail } = useLocalSearchParams<{ email: string }>();
-  const { verifyOTP, loading, error, setError } = useAuthStore();
+  const { email: paramEmail, source = "signup" } = useLocalSearchParams<{ email: string,source?: VerifyMode  }>();
+  const { initialize, verifyOTP, loading, error, setError } = useAuthStore();
 
   const [code, setCode] = useState('');
   const [validationError, setValidationError] = useState<string | null>(null);
@@ -25,33 +30,95 @@ export default function VerifyEmailScreen() {
   }, [resendCountdown]);
 
   const handleVerifyCode = async () => {
-    setValidationError(null);
-    setError(null);
+  setValidationError(null);
+  setError(null);
 
-    if (!code.trim()) {
-      setValidationError('Verification code is required');
-      return;
+  if (!code.trim()) {
+    setValidationError('Verification code is required');
+    return;
+  }
+
+  if (code.length !== 6) {
+    setValidationError('Code must be 6 digits');
+    return;
+  }
+
+  try {
+    const type = source === "reset-password" ? "recovery" : "email"
+    await verifyOTP(
+      paramEmail, 
+      code,
+      type
+    );
+
+    if (source === "signup" || source === "join-family") {
+      initialize();
+
+      if (source === "join-family") {
+        // Fetch the member row that was just claimed to get name/role/family_id
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: member } = await supabase
+            .from('member')
+            .select('name, role, family_id')
+            .eq('user_id', user.id)
+            .maybeSingle();
+
+          if (member) {
+            try {
+              await notifyAdmins({
+                familyId: member.family_id,
+                type: 'member_joined',
+                priority: 'important',
+                title: 'New family member joined',
+                body: `${member.name} has joined as a ${member.role}.`,
+                actionRoute: '/(profile)/members',
+                excludeUserId: user.id,
+              });
+            } catch (error) {
+              console.error('Failed to notify admins:', error);
+            }
+
+            try {
+              await supabase.functions.invoke('member-joined-email', {
+                body: {
+                  family_id: member.family_id,
+                  new_member_name: member.name,
+                  new_member_role: member.role,
+                },
+              });
+            } catch (error) {
+              console.error('Failed to send join email:', error);
+            }
+          }
+        }
+        
+        router.replace("/(tabs)");
+
+      }else{
+        router.replace("/(onboarding)/welcome");
+      }
     }
 
-    if (code.length !== 6) {
-      setValidationError('Code must be 6 digits');
-      return;
+    if (source === "reset-password") {
+      router.replace('/reset-password');
     }
 
-    try {
-      await verifyOTP(paramEmail || '', code);
-      router.replace('/(onboarding)/welcome');
-    } catch (err) {
-      // Error is already set in store
+  } catch (err) {
+    const message = err instanceof Error ? err.message : '';
+    if (message.includes('Invalid or already used signup code')) {
+      setValidationError(
+        'This code was just claimed by someone else. Please check with your family admin for a new code.'
+      );
     }
-  };
+    // Other errors are already set in store via setError
+  }
+};
 
   const handleResendCode = async () => {
     setResendLoading(true);
     setError(null);
     try {
-      // Resend is handled by calling signUp again
-      // In a real app, you'd have a separate resendOTP function
       setResendCountdown(60);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to resend code';
@@ -60,6 +127,24 @@ export default function VerifyEmailScreen() {
       setResendLoading(false);
     }
   };
+
+  const config = {
+    "signup": {
+      title: "Verify Email",
+      subtitle: `We sent a 6-digit code to\n${paramEmail}`,
+      button: "Verify Email",
+    },
+    "reset-password": {
+      title: "Verify Recovery Code",
+      subtitle: `Enter the recovery code sent to\n${paramEmail}`,
+      button: "Continue",
+    },
+    "join-family": {
+      title: "Verify Email",
+      subtitle: `We sent a 6-digit code to\n${paramEmail}`,
+      button: "Join Family",
+    },
+  }[source];
 
   const displayError = validationError || error;
 
@@ -74,9 +159,9 @@ export default function VerifyEmailScreen() {
           {/* Header */}
           <View className="mb-8 items-center">
             <Text className="text-4xl mb-4">✉️</Text>
-            <Text className="text-3xl font-bold text-foreground mb-2">Verify Email</Text>
+            <Text className="text-3xl font-bold text-foreground mb-2">{config.title}</Text>
             <Text className="text-base text-muted text-center">
-              We sent a 6-digit code to {'\n'}{paramEmail}
+              {config.subtitle}
             </Text>
           </View>
 

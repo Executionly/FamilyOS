@@ -1,137 +1,157 @@
-import { useState } from 'react';
-import { ScrollView, Text, View, TextInput, Pressable, ActivityIndicator, TouchableOpacity } from 'react-native';
-import { Link, useRouter } from 'expo-router';
-import { ScreenContainer } from '@/components/screen-container';
-import { useAuthStore } from '@/lib/stores/auth-store';
-import { useColors } from '@/hooks/use-colors';
+import { useState } from "react";
+import {
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { router } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
+import { useColors } from "@/hooks/use-colors";
+import { useAuthStore } from "@/lib/stores/auth-store";
 
 export default function ForgotPasswordScreen() {
-  const router = useRouter();
   const colors = useColors();
-  const { resetPassword, loading, error, setError } = useAuthStore();
+  const {forgotPassword} = useAuthStore()
+  const [email, setEmail] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const [email, setEmail] = useState('');
-  const [validationError, setValidationError] = useState<string | null>(null);
-  const [submitted, setSubmitted] = useState(false);
-
-  const handleResetPassword = async () => {
-    setValidationError(null);
-    setError(null);
-
+  const validate = () => {
     if (!email.trim()) {
-      setValidationError('Email is required');
-      return;
+      setError("Please enter your email address.");
+      return false;
     }
 
+    const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    if (!regex.test(email.trim())) {
+      setError("Please enter a valid email address.");
+      return false;
+    }
+
+    setError("");
+    return true;
+  };
+
+  const handleContinue = async () => {
+    if (!validate()) return;
+
     try {
-      await resetPassword(email);
-      setSubmitted(true);
-    } catch (error) {
-      // Error is already set in store
+      setLoading(true);
+
+      await forgotPassword(email)
+
+      router.push(`/verify-email?email=${email}&source=reset-password`);
+    } catch (e: any) {
+      setError(e.message ?? "Something went wrong.");
+    } finally {
+      setLoading(false);
     }
   };
 
-  const displayError = validationError || error;
-
-  if (submitted) {
-    return (
-      <ScreenContainer containerClassName="bg-background" safeAreaClassName="bg-background">
-        <View className="flex-1 justify-center px-6 py-8">
-          <View className="items-center mb-8">
-            <Text className="text-4xl mb-4">✓</Text>
-            <Text className="text-2xl font-bold text-foreground mb-2">Check Your Email</Text>
-            <Text className="text-base text-muted text-center">
-              We've sent a password reset link to {email}
-            </Text>
-          </View>
-
-          <View className="bg-surface rounded-lg p-4 mb-8">
-            <Text className="text-sm text-muted">
-              Click the link in the email to reset your password. If you don't see it, check your spam folder.
-            </Text>
-          </View>
-
-          <Link href="/(auth)/sign-in" asChild>
-            <Pressable
-              style={{ backgroundColor: colors.primary }}
-              className="rounded-lg py-4 items-center"
-            >
-              <Text className="text-base font-semibold text-background">Back to Sign In</Text>
-            </Pressable>
-          </Link>
-        </View>
-      </ScreenContainer>
-    );
-  }
-
   return (
-    <ScreenContainer containerClassName="bg-background" safeAreaClassName="bg-background">
-      <ScrollView
-        contentContainerStyle={{ flexGrow: 1 }}
-        showsVerticalScrollIndicator={false}
+    <SafeAreaView className="flex-1 bg-background">
+      <KeyboardAvoidingView
         className="flex-1"
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
-        <View className="flex-1 justify-center px-6 py-8">
+        <View className="flex-1 px-6">
+
           {/* Header */}
-          <View className="mb-8 items-center">
-            <Text className="text-4xl font-bold text-foreground mb-2">Reset Password</Text>
-            <Text className="text-base text-muted text-center">
-              Enter your email and we'll send you a link to reset your password
+
+          <Pressable
+            onPress={() => router.back()}
+            className="mt-2 h-11 w-11 items-center justify-center rounded-full bg-surface"
+          >
+            <Ionicons
+              name="arrow-back"
+              size={22}
+              color={colors.foreground}
+            />
+          </Pressable>
+
+          <View className="mt-10">
+            <Text className="text-3xl font-bold text-foreground">
+              Forgot Password
+            </Text>
+
+            <Text className="mt-3 text-base leading-6 text-muted">
+              Enter the email associated with your Fambound account and we'll
+              send you a verification code to reset your password.
             </Text>
           </View>
 
-          {/* Error Message */}
-          {displayError && (
-            <View className="mb-6 p-4 bg-error/10 rounded-lg border border-error/20">
-              <Text className="text-sm text-error font-medium">{displayError}</Text>
-            </View>
-          )}
+          {/* Form */}
 
-          {/* Email Input */}
-          <View className="mb-6">
-            <Text className="text-sm font-semibold text-foreground mb-2">Email</Text>
+          <View className="mt-12">
+
+            <Text className="mb-2 text-sm font-medium text-foreground">
+              Email Address
+            </Text>
+
             <TextInput
-              placeholder="you@example.com"
-              placeholderTextColor={colors.muted}
               value={email}
-              onChangeText={setEmail}
-              editable={!loading}
-              autoCapitalize="none"
-              keyboardType="email-address"
-              className="bg-surface border border-border rounded-lg px-4 py-3 text-foreground text-base"
-              style={{
-                color: colors.foreground,
-                borderColor: colors.border,
-                backgroundColor: colors.surface,
+              onChangeText={(text) => {
+                setEmail(text);
+                if (error) setError("");
               }}
+              placeholder="john@example.com"
+              placeholderTextColor={colors.muted}
+              autoCapitalize="none"
+              autoCorrect={false}
+              keyboardType="email-address"
+              textContentType="emailAddress"
+              className="rounded-2xl border border-border bg-surface px-4 py-4 text-base text-foreground"
             />
+
+            {!!error && (
+              <Text className="mt-2 text-sm text-error">
+                {error}
+              </Text>
+            )}
           </View>
 
-          {/* Reset Button */}
-           <TouchableOpacity
-           onPress={handleResetPassword}
+          <View className="flex-1" />
+
+          {/* Continue */}
+
+          <TouchableOpacity
             disabled={loading}
-          className='py-4 items-center bg-primary rounded-lg mb-8'>
-              {loading ? (
-                <ActivityIndicator color={"#fff"} />
-              ) : (
-                <Text className='text-foreground text-base font-semibold'>
-                  Send Reset Link
-                </Text>
-              )}
+            onPress={handleContinue}
+            className={`items-center rounded-lg py-4 bg-primary`}
+          >
+            {loading ? (
+              <ActivityIndicator color="white" />
+            ) : (
+              <Text className="text-base font-semibold text-white">
+                Continue
+              </Text>
+            )}
           </TouchableOpacity>
 
-          {/* Back to Sign In Link */}
-          <View className="flex-row justify-center items-center">
-            <Text className="text-sm text-muted">Remember your password? </Text>
-            <Link href="/(auth)/sign-in" asChild>
-              <Pressable>
-                <Text className="text-sm font-semibold text-primary">Sign in</Text>
-              </Pressable>
-            </Link>
+          <View className="mb-6 mt-5 flex-row justify-center">
+            <Text className="text-muted">
+              Remember your password?
+            </Text>
+
+            <Pressable
+              className="ml-2"
+              onPress={() => router.replace("/(auth)/sign-in")}
+            >
+              <Text className="font-semibold text-primary">
+                Sign In
+              </Text>
+            </Pressable>
           </View>
+
         </View>
-      </ScrollView>
-    </ScreenContainer>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }

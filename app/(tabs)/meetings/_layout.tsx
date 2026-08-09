@@ -12,6 +12,8 @@ export default function MeetingLayout() {
       <Stack.Screen name="run" />
       <Stack.Screen name="setup" />
       <Stack.Screen name="summary" />
+      <Stack.Screen name="meeting-list" />
+      <Stack.Screen name="edit" />
     </Stack>
   );
 }

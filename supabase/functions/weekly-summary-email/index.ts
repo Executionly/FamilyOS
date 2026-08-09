@@ -23,7 +23,7 @@ async function generateAIInsight(activitySummary: string): Promise<string> {
       messages: [
         {
           role: 'system',
-          content: 'You are FamilyOS, a warm and encouraging AI Family Chief of Staff. Write a single short, encouraging insight (2-3 sentences max) for a family based on their weekly activity data. Be specific, positive, and actionable. No generic platitudes.',
+          content: 'You are Fambound, a warm and encouraging AI Family Chief of Staff. Write a single short, encouraging insight (2-3 sentences max) for a family based on their weekly activity data. Be specific, positive, and actionable. No generic platitudes.',
         },
         {
           role: 'user',
@@ -45,7 +45,7 @@ async function sendEmail(to: string, subject: string, html: string) {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      from: 'Avertune <info@avertune.com>',
+      from: 'Fambound <info@fambound.com>',
       to: [to],
       subject,
       html,
@@ -99,7 +99,7 @@ function buildWeeklyEmailHTML(data: {
           <!-- Header -->
           <tr>
             <td style="background:#0F172A;padding:32px;text-align:center;">
-              <p style="color:#F59E0B;font-size:13px;font-weight:700;letter-spacing:2px;margin:0 0 8px;">FAMILYOS™</p>
+              <p style="color:#F59E0B;font-size:13px;font-weight:700;letter-spacing:2px;margin:0 0 8px;">FAMBOUND</p>
               <h1 style="color:#fff;font-size:24px;font-weight:800;margin:0 0 8px;">Weekly Family Summary</h1>
               <p style="color:#94A3B8;font-size:14px;margin:0;">The ${familyName} Family · ${weekRange}</p>
             </td>
@@ -162,20 +162,12 @@ function buildWeeklyEmailHTML(data: {
           </tr>
 
           <!-- CTA -->
-          <tr>
-            <td style="padding:0 32px 32px;text-align:center;">
-              <a href="${APP_URL}" style="display:inline-block;background:#F59E0B;color:#fff;font-weight:700;font-size:14px;padding:14px 32px;border-radius:10px;text-decoration:none;">
-                Open FamilyOS →
-              </a>
-            </td>
-          </tr>
 
           <!-- Footer -->
           <tr>
             <td style="background:#F8FAFC;padding:20px 32px;text-align:center;border-top:1px solid #E2E8F0;">
               <p style="color:#94A3B8;font-size:12px;margin:0;">
-                You're receiving this because you're the family administrator of the ${familyName} family on FamilyOS™.<br/>
-                <a href="${APP_URL}/notification-preferences" style="color:#F59E0B;">Manage email preferences</a>
+                You're receiving this because you're the family administrator of the ${familyName} family on Fambound.<br/>
               </p>
             </td>
           </tr>

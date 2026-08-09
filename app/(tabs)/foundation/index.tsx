@@ -5,13 +5,15 @@ import { ScreenContainer } from '@/components/screen-container';
 import { useCharterStore } from '@/lib/stores/charter-store';
 import { useFamilyStore } from '@/lib/stores/family-store';
 import { useColors } from '@/hooks/use-colors';
+import { isAdminAccess } from '@/utils';
 
 export default function FoundationBuilderScreen() {
   const router = useRouter();
   const colors = useColors();
   const { charter, fetchCharter, loading: charterLoading } = useCharterStore();
-  const { family } = useFamilyStore();
+  const { family, currentMember } = useFamilyStore();
   const [loading, setLoading] = useState(true);
+  const isEditor = isAdminAccess(currentMember?.role)
 
   useEffect(() => {
     const loadCharter = async () => {
@@ -119,21 +121,21 @@ export default function FoundationBuilderScreen() {
                 <Pressable
                   onPress={handleViewCharter}
                   style={{ backgroundColor: colors.primary }}
-                  className="rounded-lg py-4 items-center"
+                  className="rounded-lg py-3 items-center"
                 >
                   <Text className="text-base font-semibold text-background">View Full Charter</Text>
                 </Pressable>
 
-                <Pressable
+                {isEditor && <Pressable
                   onPress={handleEditCharter}
                   style={({ pressed }) => [
                     { backgroundColor: colors.surface, borderColor: colors.border },
                     pressed && { opacity: 0.7 },
                   ]}
-                  className="border rounded-lg py-4 items-center"
+                  className="border rounded-lg py-3 items-center"
                 >
                   <Text className="text-base font-semibold text-foreground">Edit Charter</Text>
-                </Pressable>
+                </Pressable>}
               </View>
 
               {/* Last Updated */}
@@ -171,13 +173,13 @@ export default function FoundationBuilderScreen() {
               </View>
 
               {/* Start Button */}
-              <Pressable
+              {isEditor && <Pressable
                 onPress={handleStartCharter}
                 style={{ backgroundColor: colors.primary }}
-                className="rounded-lg py-4 items-center"
+                className="rounded-lg py-3 items-center"
               >
                 <Text className="text-base font-semibold text-background">Start Building Charter</Text>
-              </Pressable>
+              </Pressable>}
             </>
           )}
         </View>

@@ -6,15 +6,18 @@ import { useCharterStore } from '@/lib/stores/charter-store';
 import { useFamilyStore } from '@/lib/stores/family-store';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { useColors } from '@/hooks/use-colors';
+import { AppHeader } from '@/components/app-header';
+import { isAdminAccess } from '@/utils';
 
 export default function CharterPreviewScreen() {
   const router = useRouter();
   const colors = useColors();
-  const { draftMission, draftVision, draftValues, draftConstitution, createCharter, clearDrafts,charter } = useCharterStore();
-  const { family } = useFamilyStore();
+  const { draftMission, draftVision, draftValues, updateCharter, draftConstitution, createCharter, clearDrafts,charter } = useCharterStore();
+  const { family, currentMember } = useFamilyStore();
   const { user } = useAuthStore();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const isEditor = isAdminAccess(currentMember?.role)
 
   const handleSaveCharter = async () => {
     setError(null);
@@ -25,12 +28,18 @@ export default function CharterPreviewScreen() {
         throw new Error('Family or user not found');
       }
 
-      await createCharter(family.id, {
+      const charterData = {
         mission: draftMission,
         vision: draftVision,
         values: draftValues,
         constitution: draftConstitution,
-      });
+      };
+
+      if (charter?.id) {
+        await updateCharter(charter.id, charterData);
+      } else {
+        await createCharter(family.id, charterData);
+      }
 
       clearDrafts();
       router.replace('/(tabs)/foundation');
@@ -70,6 +79,7 @@ ${draftConstitution}`;
 
   return (
     <ScreenContainer containerClassName="bg-background" safeAreaClassName="bg-background">
+      <AppHeader title="Family Charter" showBack />
       <ScrollView
         contentContainerStyle={{ flexGrow: 1 }}
         showsVerticalScrollIndicator={false}
@@ -129,18 +139,18 @@ ${draftConstitution}`;
           <View className="gap-3">
             {/* Save Button */}
 
-            <TouchableOpacity
+            {isEditor && <TouchableOpacity
             onPress={handleSaveCharter}
             disabled={loading}
             className='py-4 items-center bg-primary rounded-lg mb-2'>
               {loading ? (
                 <ActivityIndicator color={"#fff"} />
               ) : (
-                <Text className='text-foreground text-base font-semibold'>
-                  Save Charter
+                <Text className='text-white text-base font-semibold'>
+                  {charter?.id ? "Update" : "Save"} Charter
                 </Text>
               )}
-            </TouchableOpacity>
+            </TouchableOpacity>}
 
             {/* Share Button */}
             <Pressable

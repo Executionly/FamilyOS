@@ -1,6 +1,10 @@
 import { create } from 'zustand';
 import { supabase } from '@/lib/_core/supabase';
 import { notifyAssignment, notifyFamily } from '../services/notify';
+import { embedContent } from '../services/embed-content';
+import { useAuthStore } from './auth-store';
+import { useFamilyStore } from './family-store';
+import { useToastStore } from './toast-store';
 
 export interface Commitment {
   id: string;
@@ -27,12 +31,73 @@ interface CommitmentState {
   updateCommitment: (commitmentId: string, updates: Partial<Commitment>) => Promise<void>;
   deleteCommitment: (commitmentId: string) => Promise<void>;
   setError: (error: string | null) => void;
+
+  channel: ReturnType<typeof supabase.channel> | null;
+  subscribeToRealtime: (familyId: string) => void;
+  unsubscribeFromRealtime: () => void;
 }
 
 export const useCommitmentStore = create<CommitmentState>((set, get) => ({
   commitments: [],
   loading: false,
   error: null,
+
+  channel: null,
+
+  subscribeToRealtime: (familyId: string) => {
+    const topic = `commitments-${familyId}`;
+
+    const existing = supabase.getChannels().find((ch) => ch.topic === `realtime:${topic}`);
+    if (existing) {
+      supabase.removeChannel(existing);
+    }
+    const channel = supabase
+      .channel(topic)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'commitment', filter: `family_id=eq.${familyId}` },
+        (payload) => {
+          if (payload.eventType === 'INSERT') {
+            const newCommitment = payload.new as Commitment;
+            const currentUserId = useAuthStore.getState().user?.id;
+
+            set((state) => {
+              if (state.commitments.some((c) => c.id === newCommitment.id)) return state;
+              return { commitments: [newCommitment, ...state.commitments] };
+            });
+
+            if (newCommitment.created_by === currentUserId) return; // don't toast yourself
+
+            const currentMember = useFamilyStore.getState().currentMember;
+            if (currentMember && newCommitment.assigned_to === currentMember.id) {
+              useToastStore.getState().showToast({
+                title: 'New commitment assigned to you',
+                body: newCommitment.title,
+                variant: 'assigned',
+                actionRoute: '/(tabs)/meetings',
+              });
+            }
+          } else if (payload.eventType === 'UPDATE') {
+            set((state) => ({
+              commitments: state.commitments.map((c) => (c.id === payload.new.id ? (payload.new as Commitment) : c)),
+            }));
+          } else if (payload.eventType === 'DELETE') {
+            set((state) => ({
+              commitments: state.commitments.filter((c) => c.id !== payload.old.id),
+            }));
+          }
+        }
+      )
+      .subscribe();
+
+    set({ channel });
+  },
+
+  unsubscribeFromRealtime: () => {
+    const { channel } = get();
+    if (channel) supabase.removeChannel(channel);
+    set({ channel: null });
+  },
 
   fetchCommitments: async (familyId: string) => {
     set({ loading: true });
@@ -44,7 +109,6 @@ export const useCommitmentStore = create<CommitmentState>((set, get) => ({
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      console.log("data",data)
       set({ commitments: data || [], error: null });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to fetch commitments';
@@ -81,6 +145,12 @@ export const useCommitmentStore = create<CommitmentState>((set, get) => ({
         },
         actionLabel: 'View',
         actionRoute: '/(tabs)/meetings',
+      });
+      embedContent({
+        family_id: familyId,
+        source_type: 'commitment',
+        source_id: data.id,
+        content: `Commitment: ${data.title}. ${data.description ?? ''}${data.due_date ? ` Due ${new Date(data.due_date).toLocaleDateString()}.` : ''}`,
       });
       return data;
     } catch (error) {

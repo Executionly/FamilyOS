@@ -6,6 +6,7 @@ import { useCharterStore } from '@/lib/stores/charter-store';
 import { useColors } from '@/hooks/use-colors';
 import { generateConstitution } from '@/lib/services/charter-ai';
 import { useFamilyStore } from '@/lib/stores/family-store';
+import { AppHeader } from '@/components/app-header';
 
 export default function ConstitutionScreen() {
   const router = useRouter();
@@ -42,6 +43,7 @@ export default function ConstitutionScreen() {
 
   return (
     <ScreenContainer containerClassName="bg-background" safeAreaClassName="bg-background">
+      <AppHeader title="Family Constitution" showBack />
       <ScrollView
         contentContainerStyle={{ flexGrow: 1 }}
         showsVerticalScrollIndicator={false}

@@ -5,8 +5,10 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { ScreenContainer } from '@/components/screen-container';
 import { useColors } from '@/hooks/use-colors';
 import { useFamilyStore } from '@/lib/stores/family-store';
-import { useCalendarStore } from '@/lib/stores/calendar-store';
+import {  useCalendarStore } from '@/lib/stores/calendar-store';
 import { AppHeader } from '@/components/app-header';
+import { CATEGORIES, EventCategory } from '@/constants/event-categories';
+import { Ionicons } from '@expo/vector-icons';
 
 const COLORS = ['#F59E0B', '#3B82F6', '#10B981', '#EF4444', '#8B5CF6', '#EC4899'];
 
@@ -17,11 +19,12 @@ export default function CreateEventScreen() {
   const { createEvent, loading } = useCalendarStore();
 
   const [title, setTitle] = useState('');
+  const [category, setCategory] = useState<EventCategory>('general');
   const [startDate, setStartDate] = useState(new Date());
   const [endDate, setEndDate] = useState(new Date(Date.now() + 3600000)); // 1 hour later
   const [location, setLocation] = useState('');
   const [selectedColor, setSelectedColor] = useState(COLORS[0]);
-  const [recurrence, setRecurrence] = useState<'none' | 'daily' | 'weekly' | 'monthly' | 'yearly'>('none');
+  const [recurrence, setRecurrence] = useState<'none' | 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'bimonthly' | 'quaterly' | 'annually'>('none');
   const [showStartDatePicker, setShowStartDatePicker] = useState(false);
   const [showStartTimePicker, setShowStartTimePicker] = useState(false);
   const [showEndDatePicker, setShowEndDatePicker] = useState(false);
@@ -56,6 +59,7 @@ export default function CreateEventScreen() {
     try {
       await createEvent(family.id, family.created_by, {
         title,
+        category,
         start_date: startDate.toISOString(),
         end_date: endDate.toISOString(),
         location: location || undefined,
@@ -75,6 +79,39 @@ export default function CreateEventScreen() {
       <AppHeader title="Create Event" showBack />
       <ScrollView contentContainerStyle={{ flexGrow: 1 }} showsVerticalScrollIndicator={false}>
         <View className="flex-1 px-6 pb-8">
+
+          {/* Intro copy — the whole point of this change */}
+          <View className="mb-4 rounded-2xl border border-primary bg-primary/5 p-3">
+            <Text className="text-sm font-semibold text-foreground">Track more than birthdays</Text>
+            <Text className="mt-1 text-xs leading-5 text-muted">
+              Use your calendar for school schedules, medical appointments, travel plans, bills, kids'
+              activities, household tasks, family routines, and anything else your family needs to stay on top of.
+            </Text>
+          </View>
+
+          {/* Category */}
+          <View className="mb-6">
+            <Text className="text-sm font-semibold text-foreground mb-3">What's this for?</Text>
+            <View className="flex-row flex-wrap gap-2">
+              {CATEGORIES.map((cat) => {
+                const selected = category === cat.key;
+                return (
+                  <Pressable
+                    key={cat.key}
+                    onPress={() => setCategory(cat.key)}
+                    className={`flex-row items-center gap-1.5 rounded-full border px-3 py-2 ${
+                      selected ? 'border-primary bg-primary' : 'border-border bg-surface'
+                    }`}
+                  >
+                    <Ionicons name={cat.icon} size={14} color={selected ? '#fff' : colors.foreground} />
+                    <Text className={`text-xs font-semibold ${selected ? 'text-white' : 'text-foreground'}`}>
+                      {cat.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
 
           {/* Title */}
           <View className="mb-6">
@@ -205,7 +242,7 @@ export default function CreateEventScreen() {
           <View className="mb-8">
             <Text className="text-sm font-semibold text-foreground mb-3">Recurrence</Text>
             <View className="flex-row gap-2 flex-wrap">
-              {(['none', 'daily', 'weekly', 'monthly', 'yearly'] as const).map((r) => (
+              {(['none', 'daily', 'weekly', 'biweekly', 'monthly','bimonthly', 'quaterly','annually'] as const).map((r) => (
                 <Pressable
                   key={r}
                   onPress={() => setRecurrence(r)}
@@ -232,7 +269,7 @@ export default function CreateEventScreen() {
           <Pressable
             onPress={handleCreate}
             disabled={loading}
-            className="py-4 rounded-lg items-center"
+            className="py-4 mb-2 rounded-lg items-center"
             style={{ backgroundColor: colors.primary, opacity: loading ? 0.6 : 1 }}
           >
             {loading ? (

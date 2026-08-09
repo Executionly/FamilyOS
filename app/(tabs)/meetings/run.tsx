@@ -14,7 +14,7 @@ export default function RunMeetingScreen() {
   const router = useRouter();
   const colors = useColors();
   const { meetingId } = useLocalSearchParams();
-  const { family } = useFamilyStore();
+  const { family, members } = useFamilyStore();
   const { currentMeeting, agendaItems, fetchMeeting, fetchAgenda, updateMeeting } = useMeetingStore();
   const { createCommitment } = useCommitmentStore();
 
@@ -71,10 +71,6 @@ export default function RunMeetingScreen() {
 
     setIsGeneratingSummary(true);
     try {
-      // const result = await generateMeetingSummary(
-      //   meetingId, decisionNotes ? [decisionNotes] : [],agendaItems
-      //     .filter((item) => item.title.includes('New Commitments'))
-      //     .map((item) => item.description || ''),);
 
       const result = await generateMeetingSummary(
         meetingId,
@@ -206,25 +202,40 @@ export default function RunMeetingScreen() {
                 color: colors.foreground, fontSize: 14, marginBottom: 10,
               }}
             />
-            <TextInput
-              placeholder="Assigned to (optional)"
-              value={newCommitmentAssignee}
-              onChangeText={setNewCommitmentAssignee}
-              placeholderTextColor={colors.muted}
-              style={{
-                borderWidth: 1, borderColor: colors.border, borderRadius: 10,
-                paddingHorizontal: 12, paddingVertical: 10,
-                color: colors.foreground, fontSize: 14, marginBottom: 12,
-              }}
-            />
+            <View className="mb-6">
+              <Text className="text-sm font-semibold text-foreground mb-2">Assign To</Text>
+              <FlatList
+                scrollEnabled={false}
+                data={members}
+                keyExtractor={(item) => item.id}
+                renderItem={({ item }) => (
+                  <Pressable
+                    onPress={() => setNewCommitmentAssignee(item.id)}
+                    className={`p-2 rounded-lg border mb-1.5 ${
+                      newCommitmentAssignee === item.id ? 'border-primary' : 'border-border'
+                    }`}
+                    style={{
+                      backgroundColor: newCommitmentAssignee === item.id ? colors.primary : colors.surface,
+                    }}
+                  >
+                    <Text
+                      className={newCommitmentAssignee === item.id ? 'text-white font-semibold' : 'text-foreground'}
+                    >
+                      {item.name}
+                    </Text>
+                  </Pressable>
+                )}
+              />
+            </View>
             <Pressable
               onPress={handleAddCommitment}
+              className='py-2 bg-primary-dark px-4 rounded-lg'
               style={({ pressed }) => ({
                 paddingVertical: 10, borderRadius: 10,
-                alignItems: 'center', backgroundColor: pressed ? '#0369A1' : colors.primary,
+                alignItems: 'center',
               })}
             >
-              <Text style={{ color: '#fff', fontWeight: '700' }}>Add Commitment</Text>
+              <Text className='text-white text-center text-sm' style={{fontWeight: '700' }}>Add Commitment</Text>
             </Pressable>
  
             {/* Show commitments added so far this session */}

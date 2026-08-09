@@ -6,15 +6,17 @@ import { useAuthStore } from '@/lib/stores/auth-store';
 import { useColors } from '@/hooks/use-colors';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/lib/_core/supabase';
+import { Ionicons } from '@expo/vector-icons';
 
 export default function SignInScreen() {
   const router = useRouter();
   const colors = useColors();
-  const { signIn, loading, error, setError } = useAuthStore();
+  const { initialize, signIn, loading, error, setError } = useAuthStore();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleSignIn = async () => {
     setValidationError(null);
@@ -40,6 +42,7 @@ export default function SignInScreen() {
           params: { email },
         });
       } else {
+        initialize()
         router.replace('/(tabs)');
       }
     } catch (error) {
@@ -61,7 +64,7 @@ export default function SignInScreen() {
           <View className="mb-8 items-center">
             <Text className="text-4xl font-bold text-foreground mb-2">Welcome Back</Text>
             <Text className="text-base text-muted text-center">
-              Sign in to your FamilyOS account
+              Sign in to your Fambound account
             </Text>
           </View>
 
@@ -94,21 +97,42 @@ export default function SignInScreen() {
 
           {/* Password Input */}
           <View className="mb-6">
-            <Text className="text-sm font-semibold text-foreground mb-2">Password</Text>
-            <TextInput
-              placeholder="••••••••"
-              placeholderTextColor={colors.muted}
-              value={password}
-              onChangeText={setPassword}
-              editable={!loading}
-              secureTextEntry
-              className="bg-surface border border-border rounded-lg px-4 py-3 text-foreground text-base"
+            <Text className="mb-2 text-sm font-semibold text-foreground">
+              Password
+            </Text>
+
+            <View
+              className="flex-row items-center rounded-lg border border-border bg-surface px-4"
               style={{
-                color: colors.foreground,
                 borderColor: colors.border,
                 backgroundColor: colors.surface,
               }}
-            />
+            >
+              <TextInput
+                placeholder="••••••••"
+                placeholderTextColor={colors.muted}
+                value={password}
+                onChangeText={setPassword}
+                editable={!loading}
+                secureTextEntry={!showPassword}
+                className="flex-1 py-4 text-base text-foreground"
+                style={{
+                  color: colors.foreground,
+                }}
+              />
+
+              <TouchableOpacity
+                onPress={() => setShowPassword((prev) => !prev)}
+                disabled={loading}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Ionicons
+                  name={showPassword ? "eye-off-outline" : "eye-outline"}
+                  size={22}
+                  color={colors.muted}
+                />
+              </TouchableOpacity>
+            </View>
           </View>
 
           {/* Forgot Password Link */}
@@ -133,11 +157,18 @@ export default function SignInScreen() {
           </TouchableOpacity>
 
           {/* Divider */}
-          {/* <View className="flex-row items-center mb-6">
+          <View className="flex-row items-center mb-6">
             <View className="flex-1 h-px bg-border" />
-            <Text className="mx-3 text-sm text-muted">Or continue with</Text>
+            <Text className="mx-3 text-sm text-muted">Or</Text>
             <View className="flex-1 h-px bg-border" />
-          </View> */}
+          </View>
+
+          <TouchableOpacity
+            onPress={() => router.push('/(auth)/join-family')}
+            className="py-3 items-center border border-primary rounded-lg mb-3"
+          >
+            <Text className="text-primary text-sm font-semibold">Join a Family</Text>
+          </TouchableOpacity>
 
           {/* OAuth Buttons */}
           {/* <View className="gap-3 mb-6">

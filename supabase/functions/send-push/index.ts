@@ -9,6 +9,7 @@ const corsHeaders = {
 interface PushPayload {
   family_id: string;
   user_id?: string;         // null = send to all family members with login
+  exclude_user_id?: string;         // null = send to all family members with login
   type: string;
   priority: 'critical' | 'important' | 'informational';
   title: string;
@@ -30,7 +31,7 @@ serve(async (req) => {
     );
 
     const payload: PushPayload = await req.json();
-    const { family_id, user_id, type, priority, title, body, action_label, action_route, data } = payload;
+    const { family_id, user_id, exclude_user_id, type, priority, title, body, action_label, action_route, data } = payload;
 
     // 1. Save to notifications table (in-app notification center)
     const { error: insertError } = await supabase
@@ -54,7 +55,7 @@ serve(async (req) => {
       .from('member')
       .select('user_id')
       .eq('family_id', family_id)
-      .eq('has_login', true)
+      //.eq('has_login', true)
       .not('user_id', 'is', null);
 
     if (user_id) {
@@ -112,6 +113,9 @@ serve(async (req) => {
     const tokens: string[] = [];
     for (const u of users) {
       if (eligibleUserIds.includes(u.id)) {
+        if (exclude_user_id && u.id === exclude_user_id) {
+          continue;
+        }
         const token = u.user_metadata?.expo_push_token;
         if (token && token.startsWith('ExponentPushToken')) {
           tokens.push(token);

@@ -60,7 +60,7 @@ export default function InviteCoparentScreen() {
           <View className="mb-8 items-center">
             <Text className="text-3xl font-bold text-foreground mb-2">Invite Co-Parent</Text>
             <Text className="text-base text-muted text-center">
-              Invite your co-parent to FamilyOS (optional)
+              Invite your co-parent to Fambound (optional)
             </Text>
           </View>
 

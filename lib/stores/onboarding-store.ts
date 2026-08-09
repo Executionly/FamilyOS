@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-export type OnboardingStep = 'welcome' | 'add-members' | 'invite-coparent' | 'ready';
+export type OnboardingStep = 'welcome' | 'add-members' | 'ready';
 
 interface OnboardingState {
   // State
@@ -63,7 +63,8 @@ export const useOnboardingStore = create<OnboardingState>((set) => ({
 
   nextStep: () => {
     set((state) => {
-      const steps: OnboardingStep[] = ['welcome', 'add-members', 'invite-coparent', 'ready'];
+      // const steps: OnboardingStep[] = ['welcome', 'add-members', 'invite-coparent', 'ready'];
+      const steps: OnboardingStep[] = ['welcome', 'add-members', 'ready'];
       const currentIndex = steps.indexOf(state.currentStep);
       const nextIndex = Math.min(currentIndex + 1, steps.length - 1);
       return { currentStep: steps[nextIndex] };
