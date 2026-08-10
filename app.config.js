@@ -28,7 +28,7 @@ module.exports = {
   },
   android: {
     adaptiveIcon: {
-      backgroundColor: "#E6F4FE",
+      backgroundColor: "#ffffff",
       foregroundImage: "./assets/images/logo.png",
       backgroundImage: "./assets/images/logo.png",
       monochromeImage: "./assets/images/logo.png",
@@ -74,7 +74,7 @@ module.exports = {
         resizeMode: "contain",
         backgroundColor: "#ffffff",
         dark: {
-          backgroundColor: "#000000",
+          backgroundColor: "#ffffff",
         },
       },
     ],
@@ -84,6 +84,10 @@ module.exports = {
         android: {
           buildArchs: ["armeabi-v7a", "arm64-v8a"],
           minSdkVersion: 24,
+          extraProguardRules: `
+            -keep class expo.modules.** { *; }
+            -dontwarn expo.modules.**
+                  `,
         },
       },
     ],
