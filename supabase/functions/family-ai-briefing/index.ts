@@ -2,6 +2,7 @@
 import { serve } from 'https://deno.land/std@0.190.0/http/server.ts';
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { TOOLS, AUTO_EXECUTE_TOOLS } from '../family-ai-chat/tools.ts';
+import { checkAiEntitlement, recordAiUsage } from '../_shared/entitlement.ts';
 
 const DEEPSEEK_API_KEY = Deno.env.get('DEEPSEEK_API_KEY')!;
 const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
@@ -53,6 +54,15 @@ serve(async (req) => {
     const currentMember = (members ?? []).find((m) => m.user_id === user_id);
 
     const currentUserIsEditor = isAdminAccess(currentMember?.role);
+
+    const entitlement = await checkAiEntitlement(supabase, family_id);
+    if (!entitlement.allowed) {
+      return new Response(JSON.stringify({
+        error: entitlement.reason,
+        upgrade_required: entitlement.reason === 'upgrade_required',
+        quota_exceeded: entitlement.reason === 'quota_exceeded',
+      }), { status: 402 }); // 402 Payment Required — semantically correct here
+    }
 
     const { data: todayEvents } = await supabase
       .from('calendar_event').select('title, start_date, location')
@@ -169,6 +179,8 @@ serve(async (req) => {
 
     // Combine newly-proposed actions with any that were already pending from earlier
     const allPendingActions = [...(existingPendingActions ?? []), ...newPendingActions];
+
+    await recordAiUsage(supabase, family_id, entitlement.isIntro);
 
     return new Response(JSON.stringify({
       briefing,

@@ -1,6 +1,7 @@
 import { serve } from 'https://deno.land/std@0.190.0/http/server.ts';
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { TOOLS, AUTO_EXECUTE_TOOLS } from './tools.ts';
+import { checkAiEntitlement, recordAiUsage } from '../_shared/entitlement.ts';
 
 const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY')!;
 const DEEPSEEK_API_KEY = Deno.env.get('DEEPSEEK_API_KEY')!;
@@ -71,6 +72,14 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: 'Missing required fields' }), { status: 400 });
     }
 
+    const entitlement = await checkAiEntitlement(supabase, family_id);
+    if (!entitlement.allowed) {
+      return new Response(JSON.stringify({
+        error: entitlement.reason,
+        upgrade_required: entitlement.reason === 'upgrade_required',
+        quota_exceeded: entitlement.reason === 'quota_exceeded',
+      }), { status: 402 }); // 402 Payment Required — semantically correct here
+    }
     const { data: insertedUserMsg } = await supabase
     .from('family_chat_messages')
     .insert([{ family_id, user_id, role: 'user', content: message }])
@@ -311,6 +320,8 @@ If asked about something unrelated to this family, gently steer the conversation
     if (assistantMsgId && pendingActions.length > 0) {
       await supabase.from('ai_action').update({ chat_message_id: assistantMsgId }).in('id', pendingActions.map((a) => a.id));
     }
+
+    await recordAiUsage(supabase, family_id, entitlement.isIntro);
 
     return new Response(JSON.stringify({
       reply: finalReplyText,

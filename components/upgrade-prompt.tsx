@@ -1,0 +1,63 @@
+import { View, Text, Modal, Pressable } from 'react-native';
+import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { useColors } from '@/hooks/use-colors';
+
+interface UpgradePromptProps {
+  visible: boolean;
+  onClose: () => void;
+  reason: 'ai_feature' | 'storage_limit' | 'quota_exceeded';
+  usedBytes?: number;
+  limitBytes?: number;
+}
+
+const COPY: Record<UpgradePromptProps['reason'], { title: string; body: string }> = {
+  ai_feature: {
+    title: 'This is a Premium feature',
+    body: "Unlock Fambound Intelligence and get personalized guidance designed for your family's growth.",
+  },
+  quota_exceeded: {
+    title: "You've used this month's AI allowance",
+    body: 'Your AI usage resets next month, or upgrade for a higher monthly allowance.',
+  },
+  storage_limit: {
+    title: "You've reached your storage limit",
+    body: 'Upgrade to Premium for unlimited photo and memory storage.',
+  },
+};
+
+export function UpgradePrompt({ visible, onClose, reason, usedBytes, limitBytes }: UpgradePromptProps) {
+  const router = useRouter();
+  const colors = useColors();
+  const copy = COPY[reason];
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <View className="flex-1 items-center justify-center bg-black/50 px-6">
+        <View className="w-full rounded-3xl bg-background p-6">
+          <View className="mb-3 h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+            <Ionicons name="lock-closed" size={20} color={colors.primary} />
+          </View>
+          <Text className="text-lg font-bold text-foreground">{copy.title}</Text>
+          <Text className="mt-2 text-sm leading-5 text-muted">{copy.body}</Text>
+
+          {reason === 'storage_limit' && limitBytes && (
+            <Text className="mt-2 text-xs text-muted">
+              {Math.round((usedBytes ?? 0) / 1024 / 1024)}MB of {Math.round(limitBytes / 1024 / 1024)}MB used
+            </Text>
+          )}
+
+          <Pressable
+            onPress={() => { onClose(); router.push('/paywall'); }}
+            className="mt-5 items-center rounded-xl bg-primary py-3.5"
+          >
+            <Text className="text-sm font-bold text-white">Upgrade to Premium</Text>
+          </Pressable>
+          <Pressable onPress={onClose} className="mt-3 items-center">
+            <Text className="text-xs font-semibold text-muted">Not now</Text>
+          </Pressable>
+        </View>
+      </View>
+    </Modal>
+  );
+}

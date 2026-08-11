@@ -82,15 +82,11 @@ module.exports = {
       "expo-build-properties",
       {
         android: {
-          buildArchs: ["armeabi-v7a", "arm64-v8a"],
-          minSdkVersion: 24,
-          extraProguardRules: `
-            -keep class expo.modules.** { *; }
-            -dontwarn expo.modules.**
-                  `,
-        },
-      },
+          extraProguardRules: "-keep class expo.modules.** { *; }\n-dontwarn expo.modules.**"
+        }
+      }
     ],
+    "expo-asset"
   ],
   experiments: {
     typedRoutes: true,

@@ -1,5 +1,6 @@
 import { serve } from 'https://deno.land/std@0.190.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { checkAiEntitlement, recordAiUsage } from '../_shared/entitlement.ts';
 
 const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY')!;
 const DEEPSEEK_API_KEY = Deno.env.get('DEEPSEEK_API_KEY')!;
@@ -31,6 +32,15 @@ serve(async (req) => {
 
     if (!family_id || !week_start_date) {
       return new Response(JSON.stringify({ error: 'Missing required fields' }), { status: 400 });
+    }
+
+    const entitlement = await checkAiEntitlement(supabase, family_id);
+    if (!entitlement.allowed) {
+      return new Response(JSON.stringify({
+        error: entitlement.reason,
+        upgrade_required: entitlement.reason === 'upgrade_required',
+        quota_exceeded: entitlement.reason === 'quota_exceeded',
+      }), { status: 402 }); // 402 Payment Required — semantically correct here
     }
 
     // 1. Family's existing meal library — so the AI reuses real meals, doesn't invent random ones
@@ -107,6 +117,8 @@ Generate a full week's meal plan (Monday–Sunday) with breakfast, lunch, dinner
     if (!deepseekRes.ok) throw new Error(`DeepSeek failed: ${await deepseekRes.text()}`);
     const deepseekData = await deepseekRes.json();
     const plan = JSON.parse(deepseekData.choices[0].message.content);
+
+    await recordAiUsage(supabase, family_id, entitlement.isIntro);
 
     // Return the raw suggestion — client shows it for admin/coparent to review and save,
     // rather than writing directly to meal_plan/meal_plan_item unconfirmed.

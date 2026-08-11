@@ -28,6 +28,7 @@ export default function StackLayout() {
       <Stack.Screen name="terms-of-service" />
       <Stack.Screen name="dm" />
       <Stack.Screen name="dm-list" />
+      <Stack.Screen name="paywall" />
     </Stack>
   );
 }
