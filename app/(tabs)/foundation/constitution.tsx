@@ -4,9 +4,10 @@ import { useRouter } from 'expo-router';
 import { ScreenContainer } from '@/components/screen-container';
 import { useCharterStore } from '@/lib/stores/charter-store';
 import { useColors } from '@/hooks/use-colors';
-import { generateConstitution } from '@/lib/services/charter-ai';
+import { generateConstitution, LlmUpgradeRequiredError } from '@/lib/services/charter-ai';
 import { useFamilyStore } from '@/lib/stores/family-store';
 import { AppHeader } from '@/components/app-header';
+import { UpgradePrompt } from '@/components/upgrade-prompt';
 
 export default function ConstitutionScreen() {
   const router = useRouter();
@@ -15,18 +16,27 @@ export default function ConstitutionScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { family } = useFamilyStore();
+  const [upgradePromptVisible, setUpgradePromptVisible] = useState(false);
+  const [upgradeReason, setUpgradeReason] = useState<'ai_feature' | 'quota_exceeded'>('ai_feature');
+
 
   const handleGenerateAISuggestions = async () => {
+    if (!family?.id) return;
     setError(null);
     setLoading(true);
     try {
-      const result = await generateConstitution(family?.name || 'Our Family', {
+      const result = await generateConstitution(family.id, family?.name || 'Our Family', {
         currentConstitution: draftConstitution,
         mission: charter?.mission,
         values: draftValues,
       });
       setAISuggestions({ constitution: result.constitution });
     } catch (err) {
+      if (err instanceof LlmUpgradeRequiredError) {
+        setUpgradeReason(err.reason ?? 'ai_feature');
+        setUpgradePromptVisible(true);
+        return;
+      }
       setError(err instanceof Error ? err.message : 'Failed to generate suggestions');
     } finally {
       setLoading(false);
@@ -130,6 +140,12 @@ export default function ConstitutionScreen() {
           </Pressable>
         </View>
       </ScrollView>
+
+      <UpgradePrompt
+        visible={upgradePromptVisible}
+        onClose={() => setUpgradePromptVisible(false)}
+        reason={upgradeReason}
+      />
     </ScreenContainer>
   );
 }

@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { supabase } from '../_core/supabase';
+import { invokeAiFunction } from '@/utils/ai-invoke';
 
 export interface PendingAction {
   id: string;
@@ -30,6 +31,10 @@ interface FamilyChatState {
   unsubscribe: () => void;
   resolveAction: (actionId: string, decision: 'approved' | 'rejected', userId: string,overrides?: { assigned_member_id: string | null }) => Promise<void>;
   pendingActionsByMessageId: Record<string, PendingAction[]>;
+
+  upgradeRequired: boolean;
+  upgradeReason: 'ai_feature' | 'quota_exceeded' | null;
+  clearUpgradePrompt: () => void;
 }
 
 export const useFamilyChatStore = create<FamilyChatState>((set, get) => ({
@@ -40,6 +45,10 @@ export const useFamilyChatStore = create<FamilyChatState>((set, get) => ({
   channel: null,
   pendingActionsByMessageId: {},
 
+  upgradeRequired: false,
+  upgradeReason: null,
+
+  clearUpgradePrompt: () => set({ upgradeRequired: false, upgradeReason: null }),
 
   loadMessages: async (familyId: string) => {
     set({ loading: true, error: null });
@@ -86,6 +95,27 @@ export const useFamilyChatStore = create<FamilyChatState>((set, get) => ({
         user_id: userId,
     };
     set((state) => ({ messages: [...state.messages, optimisticMessage] }));
+
+    const result = await invokeAiFunction('family-ai-chat', { family_id: familyId, user_id: userId, message });
+
+    if (result.upgradeReason) {
+      set((state) => ({
+        upgradeRequired: true,
+        upgradeReason: result.upgradeReason,
+        sending: false,
+        messages: state.messages.filter((m) => m.id !== optimisticMessage.id), // roll back — message wasn't actually sent
+      }));
+      return;
+    }
+
+    if (result.error) {
+      set((state) => ({
+        error: result.error,
+        sending: false,
+        messages: state.messages.filter((m) => m.id !== optimisticMessage.id),
+      }));
+      return;
+    }
 
     try {
         const {data, error } = await supabase.functions.invoke('family-ai-chat', {

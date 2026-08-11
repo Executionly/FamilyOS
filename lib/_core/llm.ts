@@ -1,36 +1,16 @@
 // lib/_core/llm.ts
 // Reusable LLM wrapper for client-side calls (Expo/React Native).
-// Identical to server/_core/llm.ts except env vars use EXPO_PUBLIC_ prefix.
+// Routes through the llm-proxy Edge Function — DeepSeek API key never
+// touches the client bundle, and entitlement/quota checks happen server-side.
 // Import invokeLLM from here in any lib/service that needs AI calls.
 
-const ENV = {
-  forgeApiUrl: process.env.EXPO_PUBLIC_DEEPSEEK_API_URL || '',
-  forgeApiKey: process.env.EXPO_PUBLIC_DEEPSEEK_API_KEY || '',
-};
+import { supabase } from './supabase';
 
 export type Role = 'system' | 'user' | 'assistant' | 'tool' | 'function';
 
-export type TextContent = {
-  type: 'text';
-  text: string;
-};
-
-export type ImageContent = {
-  type: 'image_url';
-  image_url: {
-    url: string;
-    detail?: 'auto' | 'low' | 'high';
-  };
-};
-
-export type FileContent = {
-  type: 'file_url';
-  file_url: {
-    url: string;
-    mime_type?: 'audio/mpeg' | 'audio/wav' | 'application/pdf' | 'audio/mp4' | 'video/mp4';
-  };
-};
-
+export type TextContent = { type: 'text'; text: string };
+export type ImageContent = { type: 'image_url'; image_url: { url: string; detail?: 'auto' | 'low' | 'high' } };
+export type FileContent = { type: 'file_url'; file_url: { url: string; mime_type?: 'audio/mpeg' | 'audio/wav' | 'application/pdf' | 'audio/mp4' | 'video/mp4' } };
 export type MessageContent = string | TextContent | ImageContent | FileContent;
 
 export type Message = {
@@ -42,22 +22,23 @@ export type Message = {
 
 export type Tool = {
   type: 'function';
-  function: {
-    name: string;
-    description?: string;
-    parameters?: Record<string, unknown>;
-  };
+  function: { name: string; description?: string; parameters?: Record<string, unknown> };
 };
 
 export type ToolChoicePrimitive = 'none' | 'auto' | 'required';
 export type ToolChoiceByName = { name: string };
-export type ToolChoiceExplicit = {
-  type: 'function';
-  function: { name: string };
-};
+export type ToolChoiceExplicit = { type: 'function'; function: { name: string } };
 export type ToolChoice = ToolChoicePrimitive | ToolChoiceByName | ToolChoiceExplicit;
 
+export type JsonSchema = { name: string; schema: Record<string, unknown>; strict?: boolean };
+export type OutputSchema = JsonSchema;
+export type ResponseFormat =
+  | { type: 'text' }
+  | { type: 'json_object' }
+  | { type: 'json_schema'; json_schema: JsonSchema };
+
 export type InvokeParams = {
+  familyId: string; // ← new, required — this is what makes entitlement enforcement possible
   messages: Message[];
   tools?: Tool[];
   toolChoice?: ToolChoice;
@@ -73,11 +54,7 @@ export type InvokeParams = {
   reasoning?: Record<string, unknown>;
 };
 
-export type ToolCall = {
-  id: string;
-  type: 'function';
-  function: { name: string; arguments: string };
-};
+export type ToolCall = { id: string; type: 'function'; function: { name: string; arguments: string } };
 
 export type InvokeResult = {
   id: string;
@@ -85,34 +62,23 @@ export type InvokeResult = {
   model: string;
   choices: Array<{
     index: number;
-    message: {
-      role: Role;
-      content: string | Array<TextContent | ImageContent | FileContent>;
-      tool_calls?: ToolCall[];
-    };
+    message: { role: Role; content: string | Array<TextContent | ImageContent | FileContent>; tool_calls?: ToolCall[] };
     finish_reason: string | null;
   }>;
-  usage?: {
-    prompt_tokens: number;
-    completion_tokens: number;
-    total_tokens: number;
-  };
+  usage?: { prompt_tokens: number; completion_tokens: number; total_tokens: number };
 };
 
-export type JsonSchema = {
-  name: string;
-  schema: Record<string, unknown>;
-  strict?: boolean;
-};
+export type UpgradeReason = 'ai_feature' | 'quota_exceeded' | null;
 
-export type OutputSchema = JsonSchema;
+export class LlmUpgradeRequiredError extends Error {
+  reason: UpgradeReason;
+  constructor(reason: UpgradeReason) {
+    super('AI feature requires an upgrade');
+    this.reason = reason;
+  }
+}
 
-export type ResponseFormat =
-  | { type: 'text' }
-  | { type: 'json_object' }
-  | { type: 'json_schema'; json_schema: JsonSchema };
-
-// ── normalizers (identical to server version) ─────────────────
+// ── normalizers (unchanged from the original — still needed to build the payload) ──
 
 const ensureArray = (value: MessageContent | MessageContent[]): MessageContent[] =>
   Array.isArray(value) ? value : [value];
@@ -146,7 +112,7 @@ const normalizeMessage = (message: Message) => {
 
 const normalizeToolChoice = (
   toolChoice: ToolChoice | undefined,
-  tools: Tool[] | undefined,
+  tools: Tool[] | undefined
 ): 'none' | 'auto' | ToolChoiceExplicit | undefined => {
   if (!toolChoice) return undefined;
   if (toolChoice === 'none' || toolChoice === 'auto') return toolChoice;
@@ -164,20 +130,11 @@ const normalizeToolChoice = (
 };
 
 const normalizeResponseFormat = ({
-  responseFormat,
-  response_format,
-  outputSchema,
-  output_schema,
+  responseFormat, response_format, outputSchema, output_schema,
 }: {
-  responseFormat?: ResponseFormat;
-  response_format?: ResponseFormat;
-  outputSchema?: OutputSchema;
-  output_schema?: OutputSchema;
-}):
-  | { type: 'json_schema'; json_schema: JsonSchema }
-  | { type: 'text' }
-  | { type: 'json_object' }
-  | undefined => {
+  responseFormat?: ResponseFormat; response_format?: ResponseFormat;
+  outputSchema?: OutputSchema; output_schema?: OutputSchema;
+}): { type: 'json_schema'; json_schema: JsonSchema } | { type: 'text' } | { type: 'json_object' } | undefined => {
   const explicitFormat = responseFormat || response_format;
   if (explicitFormat) {
     if (explicitFormat.type === 'json_schema' && !explicitFormat.json_schema?.schema)
@@ -191,87 +148,35 @@ const normalizeResponseFormat = ({
 
   return {
     type: 'json_schema',
-    json_schema: {
-      name: schema.name,
-      schema: schema.schema,
-      ...(typeof schema.strict === 'boolean' ? { strict: schema.strict } : {}),
-    },
+    json_schema: { name: schema.name, schema: schema.schema, ...(typeof schema.strict === 'boolean' ? { strict: schema.strict } : {}) },
   };
 };
 
-// ── retry logic (identical to server version) ─────────────────
+// ── retry logic — now wraps the Supabase Edge Function call, not a raw fetch ──
 
-const RETRY_MAX_RETRIES = 4;
+const RETRY_MAX_RETRIES = 3;
 const RETRY_BASE_DELAY_MS = 500;
-const RETRY_MAX_DELAY_MS = 30_000;
-
-type FetchInit = NonNullable<Parameters<typeof fetch>[1]>;
+const RETRY_MAX_DELAY_MS = 15_000;
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
-const parseRetryAfter = (value: string | null): number | undefined => {
-  if (!value) return undefined;
-  const seconds = Number(value);
-  if (Number.isFinite(seconds)) return Math.max(0, seconds * 1000);
-  const at = Date.parse(value);
-  return Number.isNaN(at) ? undefined : Math.max(0, at - Date.now());
-};
-
-const computeBackoffDelay = (attempt: number, retryAfterMs?: number): number => {
+const computeBackoffDelay = (attempt: number): number => {
   const cap = Math.min(RETRY_BASE_DELAY_MS * 2 ** attempt, RETRY_MAX_DELAY_MS);
-  const jittered = cap / 2 + Math.random() * (cap / 2);
-  return Math.min(Math.max(jittered, retryAfterMs ?? 0), RETRY_MAX_DELAY_MS);
-};
-
-const fetchWithBackoff = async (url: string, init: FetchInit): Promise<Response> => {
-  let lastError: unknown;
-
-  for (let attempt = 0; attempt <= RETRY_MAX_RETRIES; attempt++) {
-    try {
-      const response = await fetch(url, init);
-      if (response.ok || attempt === RETRY_MAX_RETRIES) return response;
-
-      const retryAfterMs = parseRetryAfter(response.headers.get('retry-after'));
-      try { await response.body?.cancel(); } catch { /* already settled */ }
-
-      console.warn(`LLM retry ${attempt + 1}/${RETRY_MAX_RETRIES} after status ${response.status}`);
-      await sleep(computeBackoffDelay(attempt, retryAfterMs));
-    } catch (error) {
-      lastError = error;
-      if (attempt === RETRY_MAX_RETRIES) throw error;
-      console.warn(`LLM retry ${attempt + 1}/${RETRY_MAX_RETRIES} after network error`);
-      await sleep(computeBackoffDelay(attempt));
-    }
-  }
-
-  throw lastError instanceof Error
-    ? lastError
-    : new Error('LLM request failed after exhausting retries');
+  return cap / 2 + Math.random() * (cap / 2);
 };
 
 // ── public API ────────────────────────────────────────────────
 
-const resolveApiUrl = () =>
-  ENV.forgeApiUrl && ENV.forgeApiUrl.trim().length > 0
-    ? `${ENV.forgeApiUrl.replace(/\/$/, '')}/v1/chat/completions`
-    : 'https://api.deepseek.com/v1/chat/completions';
-
-const assertApiKey = () => {
-  if (!ENV.forgeApiKey) {
-    throw new Error(
-      'EXPO_PUBLIC_DEEPSEEK_API_KEY is not configured. Add it to your .env file.'
-    );
-  }
-};
-
 export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
-  assertApiKey();
-
   const {
-    messages, tools, toolChoice, tool_choice,
+    familyId, messages, tools, toolChoice, tool_choice,
     outputSchema, output_schema, responseFormat, response_format,
     model, thinking, reasoning, maxTokens, max_tokens,
   } = params;
+
+  if (!familyId) {
+    throw new Error('invokeLLM requires familyId — every AI call must be tied to a family for entitlement checks');
+  }
 
   const payload: Record<string, unknown> = {
     messages: messages.map(normalizeMessage),
@@ -289,24 +194,37 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   if (thinking) payload.thinking = thinking;
   if (reasoning) payload.reasoning = reasoning;
 
-  const normalizedResponseFormat = normalizeResponseFormat({
-    responseFormat, response_format, outputSchema, output_schema,
-  });
+  const normalizedResponseFormat = normalizeResponseFormat({ responseFormat, response_format, outputSchema, output_schema });
   if (normalizedResponseFormat) payload.response_format = normalizedResponseFormat;
 
-  const response = await fetchWithBackoff(resolveApiUrl(), {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      authorization: `Bearer ${ENV.forgeApiKey}`,
-    },
-    body: JSON.stringify(payload),
-  });
+  let lastError: unknown;
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`LLM invoke failed: ${response.status} ${response.statusText} – ${errorText}`);
+  for (let attempt = 0; attempt <= RETRY_MAX_RETRIES; attempt++) {
+    const { data, error } = await supabase.functions.invoke('llm-proxy', {
+      body: { family_id: familyId, payload },
+    });
+
+    if (!error) return data as InvokeResult;
+
+    const status = (error as any)?.context?.status;
+
+    // 402 — entitlement/quota block. Never retry this, surface immediately.
+    if (status === 402) {
+      let reason: UpgradeReason = 'ai_feature';
+      try {
+        const body = await (error as any)?.context?.json?.();
+        if (body?.quota_exceeded) reason = 'quota_exceeded';
+      } catch {
+        // fall back to ai_feature
+      }
+      throw new LlmUpgradeRequiredError(reason);
+    }
+
+    lastError = error;
+    if (attempt === RETRY_MAX_RETRIES) break;
+    console.warn(`LLM retry ${attempt + 1}/${RETRY_MAX_RETRIES} after error`, error);
+    await sleep(computeBackoffDelay(attempt));
   }
 
-  return (await response.json()) as InvokeResult;
+  throw lastError instanceof Error ? lastError : new Error('LLM request failed after exhausting retries');
 }

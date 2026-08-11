@@ -3,7 +3,9 @@
 // Same pattern as lib/services/meeting-ai.ts — uses invokeLLM directly.
 // All functions work from what the user has already typed in the screen fields.
 
-import { invokeLLM } from '@/lib/_core/llm';
+import { invokeLLM, LlmUpgradeRequiredError } from '@/lib/_core/llm';
+
+export { LlmUpgradeRequiredError }; // re-exported so callers can `instanceof` check without importing from two places
 
 // ── Mission & Vision ──────────────────────────────────────────
 
@@ -13,9 +15,10 @@ export interface MissionVisionResult {
 }
 
 export async function generateMissionVision(
+  familyId: string,
   familyName: string,
   context: {
-    currentMission?: string; // what the user has typed so far (can be empty)
+    currentMission?: string;
     currentVision?: string;
   }
 ): Promise<MissionVisionResult> {
@@ -31,6 +34,7 @@ export async function generateMissionVision(
     .join('\n');
 
   const response = await invokeLLM({
+    familyId,
     model: 'deepseek-chat',
     maxTokens: 500,
     responseFormat: { type: 'json_object' },
@@ -59,7 +63,7 @@ Return ONLY valid JSON:
 }`,
       },
     ],
-  });
+  }); // LlmUpgradeRequiredError propagates naturally — not caught here, same throw-based contract as before
 
   const content = response.choices[0]?.message?.content;
   if (!content || typeof content !== 'string') {
@@ -85,14 +89,15 @@ Return ONLY valid JSON:
 // ── Core Values ───────────────────────────────────────────────
 
 export interface ValuesResult {
-  values: string[]; // plain string names — matches what the store expects
+  values: string[];
 }
 
 export async function generateFamilyValues(
+  familyId: string,
   familyName: string,
   context: {
-    currentValues?: string[]; // values the user has already added
-    mission?: string;          // mission if already saved
+    currentValues?: string[];
+    mission?: string;
   }
 ): Promise<ValuesResult> {
   const existingValues =
@@ -105,6 +110,7 @@ export async function generateFamilyValues(
     : '';
 
   const response = await invokeLLM({
+    familyId,
     model: 'deepseek-chat',
     maxTokens: 600,
     responseFormat: { type: 'json_object' },
@@ -163,9 +169,10 @@ export interface ConstitutionResult {
 }
 
 export async function generateConstitution(
+  familyId: string,
   familyName: string,
   context: {
-    currentConstitution?: string; // what the user has typed so far
+    currentConstitution?: string;
     mission?: string;
     values?: string[];
   }
@@ -183,6 +190,7 @@ export async function generateConstitution(
     : '';
 
   const response = await invokeLLM({
+    familyId,
     model: 'deepseek-chat',
     maxTokens: 1000,
     responseFormat: { type: 'json_object' },

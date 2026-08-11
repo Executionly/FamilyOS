@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { supabase } from '@/lib/_core/supabase';
 import { embedContent } from '../services/embed-content';
+import { invokeAiFunction } from '@/utils/ai-invoke';
 
 export type MealSlot = 'breakfast' | 'lunch' | 'dinner' | 'snack';
 
@@ -60,6 +61,11 @@ interface MealPlanState {
   generateShoppingList: (familyId: string, planId: string) => Promise<void>;
   toggleShoppingItem: (itemId: string, checked: boolean) => Promise<void>;
   fetchShoppingList: (familyId: string, planId: string) => Promise<void>;
+
+  upgradeRequired: boolean;
+  upgradeReason: 'ai_feature' | 'quota_exceeded' | null;
+  clearUpgradePrompt: () => void;
+  generateAiSuggestion: (familyId: string, weekStartDate: string, notes?: string) => Promise<any>;
 }
 
 export const useMealPlanStore = create<MealPlanState>((set, get) => ({
@@ -67,6 +73,28 @@ export const useMealPlanStore = create<MealPlanState>((set, get) => ({
   shoppingList: [],
   loading: false,
   error: null,
+
+  upgradeRequired: false,
+  upgradeReason: null,
+  clearUpgradePrompt: () => set({ upgradeRequired: false, upgradeReason: null }),
+
+  generateAiSuggestion: async (familyId, weekStartDate, notes) => {
+    set({ loading: true, error: null });
+
+    const result = await invokeAiFunction('meal-ai', { family_id: familyId, week_start_date: weekStartDate, notes });
+
+    if (result.upgradeReason) {
+      set({ upgradeRequired: true, upgradeReason: result.upgradeReason, loading: false });
+      return null;
+    }
+    if (result.error) {
+      set({ error: result.error, loading: false });
+      return null;
+    }
+
+    set({ loading: false });
+    return result.data?.plan ?? null;
+  },
 
   fetchPlanForWeek: async (familyId, weekStartDate) => {
     set({ loading: true });

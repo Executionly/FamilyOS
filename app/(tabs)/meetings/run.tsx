@@ -67,12 +67,12 @@ export default function RunMeetingScreen() {
   };
 
   const handleEndMeeting = async () => {
-    if (!meetingId || typeof meetingId !== 'string' || !currentMeeting) return;
-
+    if (!meetingId || typeof meetingId !== 'string' || !currentMeeting || !family?.id) return;
     setIsGeneratingSummary(true);
     try {
 
       const result = await generateMeetingSummary(
+        family.id,
         meetingId,
         decisionNotes.trim() ? [decisionNotes.trim()] : [],
         sessionCommitments,

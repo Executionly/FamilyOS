@@ -5,12 +5,13 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { ThemeProvider } from '@/lib/theme-provider';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { useOnboardingStore } from '@/lib/stores/onboarding-store';
-import '@/global.css';
+// import '@/global.css';
 import { usePushNotifications } from '@/hooks/use-push-notification';
 import { useFonts, SpaceGrotesk_700Bold, SpaceGrotesk_500Medium } from '@expo-google-fonts/space-grotesk';
 import { Inter_400Regular, Inter_500Medium, Inter_600SemiBold } from '@expo-google-fonts/inter';
 import { ToastHost } from '@/components/ToastHost';
 import { BriefingModal } from '@/components/briefing-modal';
+import { StatusBar } from 'expo-status-bar';
 
 
 SplashScreen.preventAutoHideAsync();
@@ -36,6 +37,7 @@ export default function RootLayout() {
   return (
       <GestureHandlerRootView style={{ flex: 1 }}>
         <ThemeProvider>
+          <StatusBar style='dark'/>
           <ToastHost />
           <BriefingModal />
           <Stack

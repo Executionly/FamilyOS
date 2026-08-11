@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/_core/supabase';
-import { invokeLLM } from '@/lib/_core/llm';
+import { invokeLLM, LlmUpgradeRequiredError } from '@/lib/_core/llm';
 
 // ── Agenda generation ─────────────────────────────────────────
 
@@ -12,7 +12,8 @@ export interface AgendaItem {
 export async function generateMeetingAgenda(
   familyId: string,
   duration: number,
-): Promise<{success: boolean, agenda: AgendaItem[]}> {
+): Promise<{ success: boolean; agenda: AgendaItem[]; upgradeReason?: 'ai_feature' | 'quota_exceeded' }> {
+
   const [charterRes, commitmentsRes] = await Promise.all([
     supabase
       .from('charter')
@@ -39,19 +40,22 @@ export async function generateMeetingAgenda(
       ? commitments.map((c) => `- ${c.title} (Due: ${c.due_date || 'No date'})`).join('\n')
       : 'No open commitments.';
 
-  const response = await invokeLLM({
-    model: 'deepseek-chat',
-    maxTokens: 1500,
-    responseFormat: { type: 'json_object' },
-    messages: [
-      {
-        role: 'system',
-        content:
-          'You are a helpful family meeting facilitator. Generate structured agendas for family meetings. Respond ONLY with valid JSON — no markdown, no backticks, no extra text.',
-      },
-      {
-        role: 'user',
-        content: `Generate a structured agenda for a ${duration}-minute family meeting.
+  let response;
+  try {
+    response = await invokeLLM({
+      familyId,
+      model: 'deepseek-chat',
+      maxTokens: 1500,
+      responseFormat: { type: 'json_object' },
+      messages: [
+        {
+          role: 'system',
+          content:
+            'You are a helpful family meeting facilitator. Generate structured agendas for family meetings. Respond ONLY with valid JSON — no markdown, no backticks, no extra text.',
+        },
+        {
+          role: 'user',
+          content: `Generate a structured agenda for a ${duration}-minute family meeting.
 
 ${charterContext}
 
@@ -73,16 +77,20 @@ Return ONLY valid JSON:
     { "title": "string", "description": "string", "order": 1 }
   ]
 }`,
-      },
-    ],
-  });
+        },
+      ],
+    });
+  } catch (err) {
+    if (err instanceof LlmUpgradeRequiredError) {
+      return { success: false, agenda: [], upgradeReason: err.reason ?? 'ai_feature' };
+    }
+    console.error('generateMeetingAgenda error:', err);
+    return { success: false, agenda: [] };
+  }
 
   const content = response.choices[0]?.message?.content;
   if (!content || typeof content !== 'string') {
-    return {
-        success: false,
-        agenda: []
-    }
+    return { success: false, agenda: [] };
   }
 
   const cleaned = content.replace(/```json|```/g, '').trim();
@@ -91,24 +99,14 @@ Return ONLY valid JSON:
   try {
     parsed = JSON.parse(cleaned);
   } catch {
-    return {
-        success: false,
-        agenda: []
-    }
-    // throw new Error(`Failed to parse agenda JSON: ${cleaned.slice(0, 200)}`);
+    return { success: false, agenda: [] };
   }
 
   if (!parsed.items || !Array.isArray(parsed.items)) {
-    return {
-        success: false,
-        agenda: []
-    }
+    return { success: false, agenda: [] };
   }
 
-  return {
-        success: true,
-        agenda: parsed.items
-    }
+  return { success: true, agenda: parsed.items };
 }
 
 // ── Meeting summary ───────────────────────────────────────────
@@ -120,23 +118,27 @@ export interface MeetingSummary {
 }
 
 export async function generateMeetingSummary(
+  familyId: string,
   meetingId: string,
   decisions: string[],
   commitments: string[],
-): Promise<{success: boolean, summary: MeetingSummary | null}> {
-  const response = await invokeLLM({
-    model: 'deepseek-chat',
-    maxTokens: 1000,
-    responseFormat: { type: 'json_object' },
-    messages: [
-      {
-        role: 'system',
-        content:
-          'You are a helpful meeting summarizer. Create clear, concise meeting summaries. Respond ONLY with valid JSON — no markdown, no backticks, no extra text.',
-      },
-      {
-        role: 'user',
-        content: `Summarize a family meeting:
+): Promise<{ success: boolean; summary: MeetingSummary | null; upgradeReason?: 'ai_feature' | 'quota_exceeded' }> {
+  let response;
+  try {
+    response = await invokeLLM({
+      familyId,
+      model: 'deepseek-chat',
+      maxTokens: 1000,
+      responseFormat: { type: 'json_object' },
+      messages: [
+        {
+          role: 'system',
+          content:
+            'You are a helpful meeting summarizer. Create clear, concise meeting summaries. Respond ONLY with valid JSON — no markdown, no backticks, no extra text.',
+        },
+        {
+          role: 'user',
+          content: `Summarize a family meeting:
 
 Key Decisions Made:
 ${decisions.length > 0 ? decisions.map((d) => `- ${d}`).join('\n') : '- None recorded'}
@@ -151,16 +153,20 @@ Return ONLY valid JSON:
   "key_decisions": ["string"],
   "action_items": ["string"]
 }`,
-      },
-    ],
-  });
+        },
+      ],
+    });
+  } catch (err) {
+    if (err instanceof LlmUpgradeRequiredError) {
+      return { success: false, summary: null, upgradeReason: err.reason ?? 'ai_feature' };
+    }
+    console.error('generateMeetingSummary error:', err);
+    return { success: false, summary: null };
+  }
 
   const content = response.choices[0]?.message?.content;
   if (!content || typeof content !== 'string') {
-    return {
-        success: false,
-        summary: null
-    }
+    return { success: false, summary: null };
   }
 
   const cleaned = content.replace(/```json|```/g, '').trim();
@@ -169,11 +175,7 @@ Return ONLY valid JSON:
   try {
     parsed = JSON.parse(cleaned);
   } catch {
-    return {
-        success: false,
-        summary: null
-    }
-    // throw new Error(`Failed to parse summary JSON: ${cleaned.slice(0, 200)}`);
+    return { success: false, summary: null };
   }
 
   const { error } = await supabase.from('meeting_summary').insert({
@@ -183,13 +185,7 @@ Return ONLY valid JSON:
     action_items: parsed.action_items,
   });
 
-  if (error) return {
-        success: false,
-        summary: null
-    }
+  if (error) return { success: false, summary: null };
 
-  return {
-        success: true,
-        summary: parsed
-    }
+  return { success: true, summary: parsed };
 }

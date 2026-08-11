@@ -4,9 +4,10 @@ import { useRouter } from 'expo-router';
 import { ScreenContainer } from '@/components/screen-container';
 import { useCharterStore } from '@/lib/stores/charter-store';
 import { useColors } from '@/hooks/use-colors';
-import { generateFamilyValues } from '@/lib/services/charter-ai';
+import { generateFamilyValues, LlmUpgradeRequiredError } from '@/lib/services/charter-ai';
 import { useFamilyStore } from '@/lib/stores/family-store';
 import { AppHeader } from '@/components/app-header';
+import { UpgradePrompt } from '@/components/upgrade-prompt';
 
 export default function CoreValuesScreen() {
   const router = useRouter();
@@ -16,6 +17,8 @@ export default function CoreValuesScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { family } = useFamilyStore();
+  const [upgradePromptVisible, setUpgradePromptVisible] = useState(false);
+  const [upgradeReason, setUpgradeReason] = useState<'ai_feature' | 'quota_exceeded'>('ai_feature');
 
   const handleAddValue = () => {
     if (!valueInput?.trim()) {
@@ -32,20 +35,26 @@ export default function CoreValuesScreen() {
   };
 
   const handleGenerateAISuggestions = async () => {
-  setError(null);
-  setLoading(true);
-  try {
-    const result = await generateFamilyValues(family?.name || 'Our Family', {
-      currentValues: draftValues,
-      mission: charter?.mission,
-    });
-    setAISuggestions({ values: result.values });
-  } catch (err) {
-    setError(err instanceof Error ? err.message : 'Failed to generate suggestions');
-  } finally {
-    setLoading(false);
-  }
-};
+    if (!family?.id) return;
+    setError(null);
+    setLoading(true);
+    try {
+      const result = await generateFamilyValues(family.id, family?.name || 'Our Family', {
+        currentValues: draftValues,
+        mission: charter?.mission,
+      });
+      setAISuggestions({ values: result.values });
+    } catch (err) {
+      if (err instanceof LlmUpgradeRequiredError) {
+        setUpgradeReason(err.reason ?? 'ai_feature');
+        setUpgradePromptVisible(true);
+        return;
+      }
+      setError(err instanceof Error ? err.message : 'Failed to generate suggestions');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleContinue = () => {
     if (draftValues?.length === 0) {
@@ -190,6 +199,11 @@ export default function CoreValuesScreen() {
           </Pressable>
         </View>
       </ScrollView>
+      <UpgradePrompt
+        visible={upgradePromptVisible}
+        onClose={() => setUpgradePromptVisible(false)}
+        reason={upgradeReason}
+      />
     </ScreenContainer>
   );
 }
