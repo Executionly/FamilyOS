@@ -31,13 +31,21 @@ export default function PaywallScreen() {
   const [purchasing, setPurchasing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
-
+  const [initDone, setInitDone] = useState(false);
 
   useEffect(() => {
     (async () => {
-      if(onboarded === 'true') {
-        await initialize()
+      if (onboarded === 'true') {
+        await initialize(); // this should populate useFamilyStore's family
       }
+      setInitDone(true);
+    })();
+  }, [onboarded]);
+
+  useEffect(() => {
+    if (!initDone || !family?.id) return;
+    (async () => {
+      setLoading(true);
       try {
         initPurchases(family?.id!);
         const current = await getOfferings();
@@ -53,7 +61,7 @@ export default function PaywallScreen() {
         setLoading(false);
       }
     })();
-  }, [onboarded]);
+  }, [initDone, family?.id]);
 
   const handlePurchase = async () => {
     if (!selectedPackage || !family?.id) return;
@@ -88,14 +96,35 @@ export default function PaywallScreen() {
   };
 
   const handleRestore = async () => {
+    if (!family?.id) return;
+
     setPurchasing(true);
+    setError(null);
+
     try {
       await restorePurchases();
-      router.back();
-    } catch {
-      setError('Nothing to restore, or restore failed.');
-    } finally {
+
       setPurchasing(false);
+      setConfirming(true);
+
+      const confirmed =
+        await useSubscriptionStore
+          .getState()
+          .pollUntilPremium(family.id);
+
+      setConfirming(false);
+
+      if (confirmed) {
+        router.back();
+      } else {
+        setError(
+          'Your purchase was restored, but activation is still processing. Please try again in a moment.'
+        );
+      }
+    } catch {
+      setPurchasing(false);
+      setConfirming(false);
+      setError('Nothing to restore, or restore failed.');
     }
   };
 
@@ -169,8 +198,8 @@ export default function PaywallScreen() {
                   <View>
                     <View className="flex-row items-center gap-2">
                       <Text className="text-sm font-bold text-foreground">
-                        {/* {isAnnual ? 'Annual' : 'Monthly'}  */}
-                        {pkg?.product?.title}
+                        {isAnnual ? 'Annual Premium' : 'Monthly Premium'}
+                        {/* {pkg?.product?.title} */}
                       </Text>
                       {isAnnual && (
                         <View className="rounded-full bg-primary px-2 py-0.5">

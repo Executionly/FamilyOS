@@ -14,10 +14,22 @@ import { useCalendarStore } from '@/lib/stores/calendar-store';
 import { useChoreStore } from '@/lib/stores/chore-store';
 import { useColors } from '@/hooks/use-colors';
 import { NotificationBell } from '@/components/Notification-Bell';
-import {Ionicons} from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { FamilyChatFab } from '@/components/family-chat-fab';
 import { useNotificationStore } from '@/lib/stores/notification-store';
-import { useAuthStore } from '@/lib/stores/auth-store';
+import { Dimensions } from 'react-native';
+
+// ── Brand palette ────────────────────────────────────────────
+const NAVY = '#044768';
+const NAVY_SOFT = '#EAF1F5';
+const CORAL = '#FE6A50';
+const CORAL_SOFT = '#FFEBE6';
+const INK = '#11181C';
+const MUTED = '#7C8A94';
+const BORDER = '#E7ECEF';
+const CARD_BG = '#FFFFFF';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 // ── SVG Progress Ring ─────────────────────────────────────────
 
@@ -47,9 +59,7 @@ function ProgressRing({
   return (
     <View style={{ alignItems: 'center' }}>
       <Svg width={size} height={size}>
-        {/* Track */}
         <Circle cx={cx} cy={cy} r={r} stroke={bg} strokeWidth={strokeWidth} fill="none" />
-        {/* Progress */}
         <Circle
           cx={cx} cy={cy} r={r}
           stroke={color}
@@ -59,22 +69,10 @@ function ProgressRing({
           strokeDashoffset={circumference / 4}
           strokeLinecap="round"
         />
-        {/* Centre label */}
-        <SvgText
-          x={cx} y={cy - 6}
-          textAnchor="middle"
-          fontSize={18}
-          fontWeight="700"
-          fill={color}
-        >
+        <SvgText x={cx} y={cy - 6} textAnchor="middle" fontSize={18} fontWeight="700" fill={color}>
           {label}
         </SvgText>
-        <SvgText
-          x={cx} y={cy + 10}
-          textAnchor="middle"
-          fontSize={9}
-          fill="#9CA3AF"
-        >
+        <SvgText x={cx} y={cy + 10} textAnchor="middle" fontSize={9} fill={MUTED}>
           {sublabel}
         </SvgText>
       </Svg>
@@ -101,17 +99,9 @@ function ActivityBars({ data, color }: { data: number[]; color: string }) {
           const y = chartH - barH;
           return (
             <G key={i}>
-              {/* Track */}
-              <Rect x={x} y={0} width={barW} height={chartH} rx={4} fill="#F1F5F9" />
-              {/* Fill */}
-              <Rect x={x} y={y} width={barW} height={barH} rx={4} fill={color} opacity={val > 0 ? 1 : 0.3} />
-              {/* Day label */}
-              <SvgText
-                x={x + barW / 2} y={chartH + 13}
-                textAnchor="middle"
-                fontSize={9}
-                fill="#9CA3AF"
-              >
+              <Rect x={x} y={0} width={barW} height={chartH} rx={4} fill={NAVY_SOFT} />
+              <Rect x={x} y={y} width={barW} height={barH} rx={4} fill={color} opacity={val > 0 ? 1 : 0.35} />
+              <SvgText x={x + barW / 2} y={chartH + 13} textAnchor="middle" fontSize={9} fill={MUTED}>
                 {days[i]}
               </SvgText>
             </G>
@@ -125,20 +115,29 @@ function ActivityBars({ data, color }: { data: number[]; color: string }) {
 // ── Stat card ─────────────────────────────────────────────────
 
 function StatCard({
-  icon: Icon, 
-  label, value, sub, accent,
+  icon: Icon,
+  label, value, sub, accent, accentBg,
 }: {
-  icon: React.ComponentType<{ size: number; color: string }>; label: string; value: string | number; sub?: string; accent: string;
+  icon: React.ComponentType<{ size: number; color: string }>;
+  label: string; value: string | number; sub?: string;
+  accent: string; accentBg: string;
 }) {
   return (
     <View
-      style={{ flex: 1, backgroundColor: '#fff', borderRadius: 14, padding: 14, borderWidth: 1, borderColor: '#E5E7EB', minWidth: 90 }}
+      style={{
+        flex: 1, backgroundColor: CARD_BG, borderRadius: 16, padding: 14,
+        borderWidth: 1, borderColor: BORDER, minWidth: 90,
+      }}
     >
-      {/* <Text style={{ fontSize: 20, marginBottom: 6 }}>{icon}</Text> */}
-      <Icon size={22} color={accent} />
-      <Text style={{ fontSize: 22, fontWeight: '800', color: accent }}>{value}</Text>
-      <Text style={{ fontSize: 11, color: '#374151', fontWeight: '600', marginTop: 1 }}>{label}</Text>
-      {sub ? <Text style={{ fontSize: 10, color: '#9CA3AF', marginTop: 2 }}>{sub}</Text> : null}
+      <View style={{
+        width: 34, height: 34, borderRadius: 10, backgroundColor: accentBg,
+        alignItems: 'center', justifyContent: 'center', marginBottom: 8,
+      }}>
+        <Icon size={18} color={accent} />
+      </View>
+      <Text style={{ fontSize: 22, fontWeight: '800', color: INK }}>{value}</Text>
+      <Text style={{ fontSize: 11, color: INK, fontWeight: '600', marginTop: 1 }}>{label}</Text>
+      {sub ? <Text style={{ fontSize: 10, color: MUTED, marginTop: 2 }}>{sub}</Text> : null}
     </View>
   );
 }
@@ -148,12 +147,42 @@ function StatCard({
 function SectionHeader({ title, action, onAction }: { title: string; action?: string; onAction?: () => void }) {
   return (
     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-      <Text style={{ fontSize: 15, fontWeight: '700', color: '#11181C' }}>{title}</Text>
+      <Text style={{ fontSize: 15, fontWeight: '700', color: INK }}>{title}</Text>
       {action && (
         <Pressable onPress={onAction}>
-          <Text style={{ fontSize: 12, color: '#0a7ea4', fontWeight: '600' }}>{action}</Text>
+          <Text style={{ fontSize: 12, color: CORAL, fontWeight: '700' }}>{action}</Text>
         </Pressable>
       )}
+    </View>
+  );
+}
+
+// ── Subscription tier badge ─────────────────────────────────────
+
+function TierBadge({ tier }: { tier?: string }) {
+  const isPremium = tier === 'premium';
+  return (
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        alignSelf: 'flex-start',
+        marginTop: 8,
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        borderRadius: 20,
+        backgroundColor: isPremium ? CORAL : 'rgba(255,255,255,0.15)',
+        gap: 5,
+      }}
+    >
+      <Ionicons
+        name={isPremium ? 'sparkles' : 'ellipse-outline'}
+        size={11}
+        color="#fff"
+      />
+      <Text style={{ fontSize: 10, fontWeight: '800', color: '#fff', letterSpacing: 0.3 }}>
+        {isPremium ? 'PREMIUM' : 'FREE PLAN'}
+      </Text>
     </View>
   );
 }
@@ -168,14 +197,15 @@ export default function AdminDashboard() {
   const { commitments, fetchCommitments } = useCommitmentStore();
   const { events, fetchEvents } = useCalendarStore();
   const { chores, fetchChores, updateChore } = useChoreStore();
-  const {unreadCount,fetchNotifications} = useNotificationStore()
+  const { unreadCount, fetchNotifications } = useNotificationStore();
   const [loading, setLoading] = useState(true);
   const memberName = (id?: string | null) => members?.find((m) => m.id === id)?.name ?? null;
 
+  const isPremium = family?.subscription_tier === 'premium';
 
   const handleFetch = () => {
-    if(!family?.id) return
-    setLoading(true)
+    if (!family?.id) return;
+    setLoading(true);
     try {
       Promise.all([
         fetchMeetings(family.id),
@@ -186,12 +216,12 @@ export default function AdminDashboard() {
         unreadCount(),
       ]);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   useEffect(() => {
-    handleFetch()
+    handleFetch();
   }, [family?.id]);
 
   // ── derived data ─────────────────────────────────────────────
@@ -210,13 +240,12 @@ export default function AdminDashboard() {
     (c) => c.due_date && isSameDay(new Date(c.due_date), today) && c.status !== 'completed'
   );
   const openCommitments = commitments.filter((c) => c.status === 'open');
-  const doneCommitments = commitments.filter((c) => c.status === 'completed' );
+  const doneCommitments = commitments.filter((c) => c.status === 'completed');
   const totalCommitments = commitments.length;
   const followThrough = totalCommitments > 0 ? doneCommitments.length / totalCommitments : 0;
   const completedChores = chores.filter((c) => c.status === 'completed').length;
   const choreRate = chores.length > 0 ? completedChores / chores.length : 0;
 
-  // 7-day activity bars (meetings per day this week)
   const weekBars = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(now);
     d.setDate(now.getDate() - (6 - i));
@@ -238,37 +267,36 @@ export default function AdminDashboard() {
     return (
       <ScreenContainer containerClassName="bg-background" safeAreaClassName="bg-background">
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={{ color: colors.muted, marginTop: 12, fontSize: 14 }}>Loading your family dashboard...</Text>
+          <ActivityIndicator size="large" color={NAVY} />
+          <Text style={{ color: MUTED, marginTop: 12, fontSize: 14 }}>Loading your family dashboard...</Text>
         </View>
       </ScreenContainer>
     );
   }
 
   return (
-    <ScreenContainer 
-    containerClassName="bg-background" 
-    safeAreaClassName="bg-background">
+    <ScreenContainer containerClassName="bg-background" safeAreaClassName="bg-background">
       <ScrollView
         contentContainerStyle={{ paddingBottom: 40 }}
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={loading} onRefresh={handleFetch}/>}
+        refreshControl={<RefreshControl refreshing={loading} onRefresh={handleFetch} tintColor={NAVY} />}
       >
         {/* ── Header ─────────────────────────────────────────── */}
         <View style={{
-          backgroundColor: '#0a7ea4',
+          backgroundColor: NAVY,
           paddingHorizontal: 24,
           paddingTop: 20,
           paddingBottom: 32,
         }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <View style={{ flex: 1 }}>
-              <Text style={{ color: 'rgba(255,255,255,0.75)', fontSize: 13, fontWeight: '500' }}>
+              <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13, fontWeight: '500' }}>
                 {now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
               </Text>
               <Text style={{ color: '#fff', fontSize: 26, fontWeight: '800', marginTop: 4, lineHeight: 32 }}>
                 {greeting()},{'\n'}{family?.name} Family 👋
               </Text>
+              <TierBadge tier={family?.subscription_tier} />
             </View>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
               <NotificationBell />
@@ -278,8 +306,8 @@ export default function AdminDashboard() {
           {/* Next meeting pill */}
           <View style={{
             marginTop: 16,
-            backgroundColor: 'rgba(255,255,255,0.15)',
-            borderRadius: 10,
+            backgroundColor: 'rgba(255,255,255,0.12)',
+            borderRadius: 12,
             paddingHorizontal: 14,
             paddingVertical: 10,
             flexDirection: 'row',
@@ -287,8 +315,8 @@ export default function AdminDashboard() {
             justifyContent: 'space-between',
           }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <Ionicons name="calendar-outline" size={20} color="white" />
-              <Text className='text-white font-semibold' style={{fontSize: 13 }}>
+              <Ionicons name="calendar-outline" size={20} color="#fff" />
+              <Text style={{ color: '#fff', fontWeight: '600', fontSize: 13 }}>
                 {nextMeeting
                   ? `Next meeting · ${new Date(nextMeeting.scheduled_date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}`
                   : 'No meeting scheduled'}
@@ -296,9 +324,9 @@ export default function AdminDashboard() {
             </View>
             <Pressable
               onPress={() => router.push('/meetings/setup')}
-              style={{ backgroundColor: '#fff', borderRadius: 6, paddingHorizontal: 10, paddingVertical: 4 }}
+              style={{ backgroundColor: CORAL, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 }}
             >
-              <Text style={{ color: '#0a7ea4', fontSize: 11, fontWeight: '700' }}>
+              <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700' }}>
                 {nextMeeting ? 'View' : 'Schedule'}
               </Text>
             </Pressable>
@@ -310,16 +338,16 @@ export default function AdminDashboard() {
 
           {/* ── Progress rings card ─────────────────────────── */}
           <View style={{
-            backgroundColor: '#fff',
-            borderRadius: 16,
+            backgroundColor: CARD_BG,
+            borderRadius: 18,
             padding: 20,
             borderWidth: 1,
-            borderColor: '#E5E7EB',
+            borderColor: BORDER,
             marginBottom: 16,
-            shadowColor: '#000',
-            shadowOpacity: 0.04,
-            shadowRadius: 8,
-            shadowOffset: { width: 0, height: 2 },
+            shadowColor: NAVY,
+            shadowOpacity: 0.06,
+            shadowRadius: 10,
+            shadowOffset: { width: 0, height: 3 },
             elevation: 2,
           }}>
             <SectionHeader title="Family Progress" />
@@ -327,36 +355,64 @@ export default function AdminDashboard() {
               <View style={{ alignItems: 'center', gap: 6 }}>
                 <ProgressRing
                   progress={followThrough}
-                  color="#0a7ea4"
-                  bg="#E0F2FE"
+                  color={NAVY}
+                  bg={NAVY_SOFT}
                   label={`${Math.round(followThrough * 100)}%`}
                   sublabel="done"
                 />
-                <Text style={{ fontSize: 11, color: '#687076', fontWeight: '600' }}>Commitments</Text>
+                <Text style={{ fontSize: 11, color: MUTED, fontWeight: '600' }}>Commitments</Text>
               </View>
               <View style={{ alignItems: 'center', gap: 6 }}>
                 <ProgressRing
                   progress={choreRate}
-                  color="#22C55E"
-                  bg="#DCFCE7"
+                  color={CORAL}
+                  bg={CORAL_SOFT}
                   label={`${Math.round(choreRate * 100)}%`}
                   sublabel="done"
                 />
-                <Text style={{ fontSize: 11, color: '#687076', fontWeight: '600' }}>Chores</Text>
+                <Text style={{ fontSize: 11, color: MUTED, fontWeight: '600' }}>Chores</Text>
               </View>
               <View style={{ alignItems: 'center', gap: 6 }}>
                 <ProgressRing
                   progress={meetings.filter((m) => m.status === 'completed').length > 0 ? 1 : 0}
-                  color="#F59E0B"
-                  bg="#FEF3C7"
+                  color={NAVY}
+                  bg={NAVY_SOFT}
                   label={`${meetings.filter((m) => m.status === 'completed').length}`}
                   sublabel="total"
                 />
-                <Text style={{ fontSize: 11, color: '#687076', fontWeight: '600' }}>Meetings</Text>
+                <Text style={{ fontSize: 11, color: MUTED, fontWeight: '600' }}>Meetings</Text>
               </View>
             </View>
           </View>
-
+{/* ── Premium upsell (only shown on free plan) ──────── */}
+          {!isPremium && (
+            <Pressable
+              onPress={() => router.push('/(stack)/paywall')}
+              style={{
+                backgroundColor: NAVY,
+                borderRadius: 18,
+                padding: 18,
+                marginBottom: 16,
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 14,
+              }}
+            >
+              <View style={{
+                width: 42, height: 42, borderRadius: 12, backgroundColor: CORAL,
+                alignItems: 'center', justifyContent: 'center',
+              }}>
+                <Ionicons name="sparkles" size={20} color="#fff" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: '#fff', fontSize: 14, fontWeight: '700' }}>Go Premium</Text>
+                <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12, marginTop: 2 }}>
+                  Unlock AI meeting agendas, unlimited members, and more.
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color="#fff" />
+            </Pressable>
+          )}
           {/* ── Stat cards row ──────────────────────────────── */}
           <View style={{ flexDirection: 'row', gap: 10, marginBottom: 16 }}>
             <StatCard
@@ -364,43 +420,46 @@ export default function AdminDashboard() {
               label="Open Tasks"
               value={openCommitments.length}
               sub={openCommitments.length === 0 ? 'All caught up!' : 'need attention'}
-              accent="#0a7ea4"
+              accent={NAVY}
+              accentBg={NAVY_SOFT}
             />
             <StatCard
               icon={(props) => <Ionicons name="calendar-clear-outline" {...props} />}
               label="Today's Events"
               value={todayEvents.length}
               sub={todayEvents.length === 0 ? 'Nothing today' : undefined}
-              accent="#F59E0B"
+              accent={CORAL}
+              accentBg={CORAL_SOFT}
             />
             <StatCard
               icon={(props) => <Ionicons name="construct-outline" {...props} />}
               label="Chores Due"
               value={todayChores.length}
               sub={todayChores.length === 0 ? 'All clear' : 'today'}
-              accent="#22C55E"
+              accent={NAVY}
+              accentBg={NAVY_SOFT}
             />
           </View>
 
           {/* ── 7-day activity chart ─────────────────────────── */}
           <View style={{
-            backgroundColor: '#fff',
-            borderRadius: 16,
+            backgroundColor: CARD_BG,
+            borderRadius: 18,
             padding: 20,
             borderWidth: 1,
-            borderColor: '#E5E7EB',
+            borderColor: BORDER,
             marginBottom: 16,
-            shadowColor: '#000',
-            shadowOpacity: 0.04,
-            shadowRadius: 8,
-            shadowOffset: { width: 0, height: 2 },
+            shadowColor: NAVY,
+            shadowOpacity: 0.06,
+            shadowRadius: 10,
+            shadowOffset: { width: 0, height: 3 },
             elevation: 2,
           }}>
             <SectionHeader title="7-Day Meeting Activity" />
             <View style={{ alignItems: 'center', paddingTop: 4 }}>
-              <ActivityBars data={weekBars} color="#0a7ea4" />
+              <ActivityBars data={weekBars} color={CORAL} />
             </View>
-            <Text style={{ fontSize: 11, color: '#9CA3AF', textAlign: 'center', marginTop: 8 }}>
+            <Text style={{ fontSize: 11, color: MUTED, textAlign: 'center', marginTop: 8 }}>
               Meetings held per day this week
             </Text>
           </View>
@@ -423,22 +482,22 @@ export default function AdminDashboard() {
                   <View style={{
                     marginRight: 10,
                     padding: 14,
-                    borderRadius: 12,
+                    borderRadius: 14,
                     borderWidth: 1,
-                    borderColor: '#E5E7EB',
-                    backgroundColor: '#fff',
+                    borderColor: BORDER,
+                    backgroundColor: CARD_BG,
                     minWidth: 160,
                     maxWidth: 200,
                   }}>
                     <View style={{
                       width: 6, height: 6, borderRadius: 3,
-                      backgroundColor: '#0a7ea4', marginBottom: 8,
+                      backgroundColor: CORAL, marginBottom: 8,
                     }} />
-                    <Text style={{ fontSize: 13, fontWeight: '600', color: '#11181C' }} numberOfLines={2}>
+                    <Text style={{ fontSize: 13, fontWeight: '600', color: INK }} numberOfLines={2}>
                       {item.title}
                     </Text>
                     {item.due_date && (
-                      <Text style={{ fontSize: 11, color: '#9CA3AF', marginTop: 6 }}>
+                      <Text style={{ fontSize: 11, color: MUTED, marginTop: 6 }}>
                         Due {new Date(item.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                       </Text>
                     )}
@@ -449,11 +508,11 @@ export default function AdminDashboard() {
                         paddingHorizontal: 8,
                         paddingVertical: 2,
                         borderRadius: 20,
-                        backgroundColor: item.priority === 'high' ? '#FEE2E2' : item.priority === 'medium' ? '#FEF3C7' : '#F0FDF4',
+                        backgroundColor: item.priority === 'high' ? CORAL : item.priority === 'medium' ? CORAL_SOFT : NAVY_SOFT,
                       }}>
                         <Text style={{
                           fontSize: 10, fontWeight: '700',
-                          color: item.priority === 'high' ? '#DC2626' : item.priority === 'medium' ? '#D97706' : '#16A34A',
+                          color: item.priority === 'high' ? '#fff' : item.priority === 'medium' ? CORAL : NAVY,
                           textTransform: 'capitalize',
                         }}>
                           {item.priority}
@@ -478,26 +537,26 @@ export default function AdminDashboard() {
                 <View key={i} style={{
                   flexDirection: 'row',
                   alignItems: 'center',
-                  backgroundColor: '#fff',
-                  borderRadius: 12,
+                  backgroundColor: CARD_BG,
+                  borderRadius: 14,
                   padding: 14,
                   marginBottom: 8,
                   borderWidth: 1,
-                  borderColor: '#E5E7EB',
+                  borderColor: BORDER,
                 }}>
                   <View style={{
                     width: 4, height: 40, borderRadius: 2,
-                    backgroundColor: item.color || '#0a7ea4',
+                    backgroundColor: NAVY,
                     marginRight: 12,
                   }} />
                   <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 14, fontWeight: '600', color: '#11181C' }}>{item.title}</Text>
-                    <Text style={{ fontSize: 12, color: '#9CA3AF', marginTop: 2 }}>
+                    <Text style={{ fontSize: 14, fontWeight: '600', color: INK }}>{item.title}</Text>
+                    <Text style={{ fontSize: 12, color: MUTED, marginTop: 2 }}>
                       {new Date(item.start_date).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
                       {item.location ? ` · ${item.location}` : ''}
                     </Text>
                   </View>
-                  <Text style={{ fontSize: 20 }}>📅</Text>
+                  <Ionicons name="calendar" size={18} color={NAVY} />
                 </View>
               ))}
             </View>
@@ -506,25 +565,32 @@ export default function AdminDashboard() {
           {/* ── Chores Due Today ────────────────────────────── */}
           {todayChores.length > 0 && (
             <View style={{ marginBottom: 16 }}>
-              <SectionHeader title="Chores Due Today" 
-              action="View all"
-              onAction={() => router.push('/(stack)/create-chore')}/>
+              <SectionHeader
+                title="Chores Due Today"
+                action="View all"
+                onAction={() => router.push('/(stack)/create-chore')}
+              />
               {todayChores.map((item, i) => (
                 <View key={i} style={{
                   flexDirection: 'row',
                   alignItems: 'center',
-                  backgroundColor: '#fff',
-                  borderRadius: 12,
+                  backgroundColor: CARD_BG,
+                  borderRadius: 14,
                   padding: 14,
                   marginBottom: 8,
                   borderWidth: 1,
-                  borderColor: '#E5E7EB',
+                  borderColor: BORDER,
                 }}>
-                  <Text style={{ fontSize: 20, marginRight: 12 }}>🧹</Text>
+                  <View style={{
+                    width: 34, height: 34, borderRadius: 10, backgroundColor: CORAL_SOFT,
+                    alignItems: 'center', justifyContent: 'center', marginRight: 12,
+                  }}>
+                    <Ionicons name="construct-outline" size={17} color={CORAL} />
+                  </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 14, fontWeight: '600', color: '#11181C' }}>{item.title}</Text>
+                    <Text style={{ fontSize: 14, fontWeight: '600', color: INK }}>{item.title}</Text>
                     {item.assigned_to && (
-                      <Text style={{ fontSize: 12, color: '#9CA3AF', marginTop: 2 }}>
+                      <Text style={{ fontSize: 12, color: MUTED, marginTop: 2 }}>
                         Assigned to {memberName(item.assigned_to)}
                       </Text>
                     )}
@@ -532,7 +598,7 @@ export default function AdminDashboard() {
                   <Pressable
                     onPress={() => handleMarkChoreComplete(item.id)}
                     style={({ pressed }) => ({
-                      backgroundColor: pressed ? '#16A34A' : '#22C55E',
+                      backgroundColor: pressed ? NAVY : CORAL,
                       borderRadius: 8,
                       paddingHorizontal: 14,
                       paddingVertical: 7,
@@ -548,80 +614,61 @@ export default function AdminDashboard() {
           {/* ── Empty state when everything is clear ────────── */}
           {openCommitments.length === 0 && todayEvents.length === 0 && todayChores.length === 0 && (
             <View style={{
-              backgroundColor: '#F0FDF4',
-              borderRadius: 16,
+              backgroundColor: NAVY_SOFT,
+              borderRadius: 18,
               padding: 24,
               alignItems: 'center',
               borderWidth: 1,
-              borderColor: '#BBF7D0',
+              borderColor: BORDER,
               marginBottom: 16,
             }}>
-              <Ionicons name="sparkles-outline" size={24} color="#4ADE80" />
-              <Text style={{ fontSize: 16, fontWeight: '700', color: '#15803D', textAlign: 'center' }}>
+              <View style={{
+                width: 44, height: 44, borderRadius: 22, backgroundColor: CORAL_SOFT,
+                alignItems: 'center', justifyContent: 'center', marginBottom: 4,
+              }}>
+                <Ionicons name="sparkles-outline" size={22} color={CORAL} />
+              </View>
+              <Text style={{ fontSize: 16, fontWeight: '700', color: NAVY, textAlign: 'center', marginTop: 6 }}>
                 All caught up!
               </Text>
-              <Text style={{ fontSize: 13, color: '#4ADE80', textAlign: 'center', marginTop: 4 }}>
+              <Text style={{ fontSize: 13, color: MUTED, textAlign: 'center', marginTop: 4 }}>
                 No open tasks, events, or chores today.
               </Text>
             </View>
           )}
 
-          {/* ── Quick Actions ────────────────────────────────── */}
-          <View style={{
-            backgroundColor: '#fff',
-            borderRadius: 16,
-            padding: 16,
-            borderWidth: 1,
-            borderColor: '#E5E7EB',
-            marginBottom: 8,
-          }}>
-            <SectionHeader title="Quick Actions" />
-            <View className='justify-between'
-            style={{ flexDirection: 'row', gap: 10 }}>
+        </View>
+        {/* ── Action Hub ─────────────────────────────────────── */}
+        <View style={{ paddingHorizontal: 24 }}>
+          <Text style={{ fontSize: 14, fontWeight: '800', color: INK, marginBottom: 16 }}>Action Hub</Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+            {[
+              { label: 'Add Event', icon: 'add-circle', route: '/(stack)/create-event', color: NAVY, bg: NAVY_SOFT },
+              { label: 'New Chore', icon: 'construct', route: '/(stack)/create-chore', color: CORAL, bg: CORAL_SOFT },
+              { label: 'Start Meeting', icon: 'people', route: '/meetings/setup', color: NAVY, bg: NAVY_SOFT },
+              { label: 'Family Members', icon: 'eye', route: '/(stack)/member-list', color: MUTED, bg: '#F1F3F5' },
+            ].map((action, i) => (
               <Pressable
-                onPress={() => router.push('/(stack)/create-event')}
-                style={({ pressed }) => ({
-                  flex: 1, paddingVertical: 14, borderRadius: 12,
-                  alignItems: 'center', gap: 4,
-                  backgroundColor: pressed ? '#E0F2FE' : '#F0F9FF',
-                  borderWidth: 1, borderColor: '#BAE6FD',
-                })}
-                className='items-center'
+                key={i}
+                onPress={() => router.push(action.route as any)}
+                style={{
+                  width: (SCREEN_WIDTH - 60) / 2,
+                  backgroundColor: action.bg,
+                  borderRadius: 20,
+                  padding: 16,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 12,
+                }}
               >
-                <Ionicons name="calendar-clear-outline" size={24} color="#0369A1" />
-                <Text style={{ fontSize: 12, fontWeight: '600', color: '#0369A1' }}>Add Event</Text>
+                <Ionicons name={action.icon as any} size={20} color={action.color} />
+                <Text style={{ fontSize: 13, fontWeight: '700', color: action.color }}>{action.label}</Text>
               </Pressable>
-              <Pressable
-                onPress={() => router.push('/(stack)/create-chore')}
-                style={({ pressed }) => ({
-                  flex: 1, paddingVertical: 14, borderRadius: 12,
-                  alignItems: 'center', gap: 4,
-                  backgroundColor: pressed ? '#DCFCE7' : '#F0FDF4',
-                  borderWidth: 1, borderColor: '#BBF7D0',
-                })}
-                 className='items-center'
-              >
-                <Ionicons name="construct-outline" size={24} color="#15803D" />
-                <Text style={{ fontSize: 12, fontWeight: '600', color: '#15803D' }}>Add Chore</Text>
-              </Pressable>
-              <Pressable
-                onPress={() => router.push('/meetings/setup')}
-                style={({ pressed }) => ({
-                  flex: 1, paddingVertical: 14, borderRadius: 12,
-                  alignItems: 'center', gap: 4,
-                  backgroundColor: pressed ? '#0369A1' : '#0a7ea4',
-                })}
-                 className='items-center'
-              >
-                <Ionicons name="calendar-outline" size={24} color="#0369A1" />
-                <Text style={{ fontSize: 12, fontWeight: '700', color: '#0a7ea4' }}>Meeting</Text>
-              </Pressable>
-            </View>
+            ))}
           </View>
-
         </View>
       </ScrollView>
-      <FamilyChatFab/>
+      <FamilyChatFab />
     </ScreenContainer>
   );
 }

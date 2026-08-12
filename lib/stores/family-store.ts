@@ -28,6 +28,7 @@ export interface Family {
   photo_url?: string;
   created_by: string;
   subscription_status: 'free' | 'premium';
+  subscription_tier: 'free' | 'premium';
   created_at: string;
   updated_at: string;
   image_url?: string;
@@ -185,7 +186,8 @@ export const useFamilyStore = create<FamilyState>((set, get) => ({
           {
             name,
             created_by: userId,
-            subscription_status: 'free',
+            subscription_status: 'inactive',
+            subscription_tier: 'free',
           },
         ])
         .select()
