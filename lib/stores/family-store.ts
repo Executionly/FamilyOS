@@ -18,6 +18,9 @@ export interface Member {
   avatar_url?: string;
   signup_code?: string;
   is_founding_admin?: boolean;
+  date_of_birth?: string | null; 
+  bio?: string; 
+  phone_number?: string
   created_at: string;
   updated_at: string;
 }
@@ -282,6 +285,7 @@ export const useFamilyStore = create<FamilyState>((set, get) => ({
 
       set((state) => ({
         members: state.members.map((m) => (m.id === memberId ? data : m)),
+        currentMember: state.currentMember?.id === memberId ? { ...state.currentMember, ...data } : state.currentMember,
         error: null,
       }));
     } catch (error) {
