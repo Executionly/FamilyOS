@@ -21,6 +21,7 @@ serve(async (req) => {
     if (['INITIAL_PURCHASE', 'RENEWAL', 'UNCANCELLATION', 'PRODUCT_CHANGE'].includes(eventType)) {
       await supabase.from('family').update({
         subscription_tier: 'premium',
+        subscription_status: 'premium',
         subscription_expires_at: event.expiration_at_ms ? new Date(event.expiration_at_ms).toISOString() : null,
         subscription_platform: event.store === 'APP_STORE' ? 'ios' : 'android',
         revenuecat_customer_id: familyId,

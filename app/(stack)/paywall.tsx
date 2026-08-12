@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import { View, Text, Pressable, ScrollView, ActivityIndicator } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { ScreenContainer } from '@/components/screen-container';
 import { useColors } from '@/hooks/use-colors';
 import { useFamilyStore } from '@/lib/stores/family-store';
-import { getOfferings, purchasePackage, restorePurchases } from '@/lib/purchases';
+import { getOfferings, initPurchases, purchasePackage, restorePurchases } from '@/lib/purchases';
 import { useSubscriptionStore } from '@/lib/stores/subscription-store';
+import { useAuthStore } from '@/lib/stores/auth-store';
 
 const FEATURES = [
   { icon: 'sparkles', text: 'AI Family Assistant that manages your calendar, tasks & more' },
@@ -20,7 +21,9 @@ const FEATURES = [
 export default function PaywallScreen() {
   const router = useRouter();
   const colors = useColors();
+  const { initialize } = useAuthStore();
   const { family } = useFamilyStore();
+  const {onboarded} = useLocalSearchParams()
 
   const [offering, setOffering] = useState<any>(null);
   const [selectedPackage, setSelectedPackage] = useState<any>(null);
@@ -32,8 +35,13 @@ export default function PaywallScreen() {
 
   useEffect(() => {
     (async () => {
+      if(onboarded === 'true') {
+        await initialize()
+      }
       try {
+        initPurchases(family?.id!);
         const current = await getOfferings();
+        console.log('Loaded offerings:', current);
         setOffering(current);
         // Default to the annual package if present — matches "recommended" from the pricing doc
         const annual = current?.availablePackages?.find((p: any) => p.packageType === 'ANNUAL');
@@ -45,7 +53,7 @@ export default function PaywallScreen() {
         setLoading(false);
       }
     })();
-  }, []);
+  }, [onboarded]);
 
   const handlePurchase = async () => {
     if (!selectedPackage || !family?.id) return;
@@ -91,6 +99,14 @@ export default function PaywallScreen() {
     }
   };
 
+  const handleNavigateBack = () => {
+    if(onboarded === 'true') {
+      router.replace('/(tabs)');
+      return;
+    }
+    router.back();
+  }
+
   if (loading) {
     return (
       <ScreenContainer containerClassName="bg-background" safeAreaClassName="bg-background">
@@ -104,7 +120,9 @@ export default function PaywallScreen() {
   return (
     <ScreenContainer containerClassName="bg-background" safeAreaClassName="bg-background">
       <ScrollView contentContainerStyle={{ padding: 24, paddingBottom: 40 }}>
-        <Pressable onPress={() => router.back()} className="mb-4 self-end">
+        <Pressable 
+        onPress={handleNavigateBack} 
+        className="mb-4 self-end">
           <Ionicons name="close" size={24} color={colors.muted} />
         </Pressable>
 
@@ -130,7 +148,7 @@ export default function PaywallScreen() {
         </View>
 
         {error && (
-          <View className="mb-4 rounded-lg border border-error/20 bg-error/10 p-3">
+          <View className="mb-4 rounded-lg border border-error p-3">
             <Text className="text-xs text-error">{error}</Text>
           </View>
         )}
@@ -140,6 +158,7 @@ export default function PaywallScreen() {
           {(offering?.availablePackages ?? []).map((pkg: any) => {
             const isSelected = selectedPackage?.identifier === pkg.identifier;
             const isAnnual = pkg.packageType === 'ANNUAL';
+            console.log("PKG", pkg)
             return (
               <Pressable
                 key={pkg.identifier}
@@ -150,7 +169,8 @@ export default function PaywallScreen() {
                   <View>
                     <View className="flex-row items-center gap-2">
                       <Text className="text-sm font-bold text-foreground">
-                        {isAnnual ? 'Annual' : 'Monthly'}
+                        {/* {isAnnual ? 'Annual' : 'Monthly'}  */}
+                        {pkg?.product?.title}
                       </Text>
                       {isAnnual && (
                         <View className="rounded-full bg-primary px-2 py-0.5">

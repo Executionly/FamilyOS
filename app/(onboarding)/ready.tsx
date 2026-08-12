@@ -59,7 +59,8 @@ export default function OnboardingReadyScreen() {
 
       // Navigate to Foundation Builder
       await initialize()
-      router.replace('/(tabs)');
+      router.replace('/paywall?onboarded=true');
+      // router.replace('/(tabs)');
     } catch (err) {
       const message =
         (err as any)?.message ||

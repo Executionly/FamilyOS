@@ -2,7 +2,7 @@ import Purchases from 'react-native-purchases';
 import { Platform } from 'react-native';
 
 const REVENUECAT_API_KEY_IOS = 'appl_xxx'; // from RevenueCat dashboard
-const REVENUECAT_API_KEY_ANDROID = 'goog_xxx';
+const REVENUECAT_API_KEY_ANDROID = 'test_zmFewLIPklsszQyeZztNFrtlgrr';
 let purchasesInitialized = false;
 
 export function initPurchases(familyId: string) {

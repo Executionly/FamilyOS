@@ -22,7 +22,8 @@ const MENU_ITEMS: MenuItem[] = [
   { icon: 'construct-outline', label: 'Manage Chores', route: '/(stack)/chores',open: true },
   { icon: 'calendar-outline', label: 'Calendar (School schedules, Travel plans...) ', route: '/(stack)/calendar', open: true },
   { icon: 'images-outline', label: 'Family Media', route: '/(stack)/media-library', open: true },
-  { icon: 'person-outline', label: 'Account Settings', route: '/(stack)/account-settings',open: true  },
+  // { icon: 'person-outline', label: 'Account Settings', route: '/(stack)/account-settings',open: true  },
+  { icon: 'person-outline', label: 'Account Settings', route: '/(stack)/paywall',open: true  },
 ];
 
 const LEGAL_ITEMS: MenuItem[] = [

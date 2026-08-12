@@ -76,7 +76,7 @@ export default function FamilyChatScreen() {
           <Text className="text-xs text-muted">Ask me anything about your family</Text>
         </View>
       </View>
-      {showIntroBanner && (
+      {showIntroBanner && !loading && (
         <View className="mx-4 mt-3 rounded-2xl border border-primary/30 bg-primary/5 p-3.5">
           <View className="flex-row items-center gap-2">
             <Ionicons name="sparkles" size={16} color={colors.primary} />
