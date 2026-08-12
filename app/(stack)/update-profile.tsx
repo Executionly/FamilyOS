@@ -9,11 +9,13 @@ import { useAuthStore } from '@/lib/stores/auth-store';
 import { useFamilyStore } from '@/lib/stores/family-store';
 import { supabase } from '@/lib/_core/supabase';
 import { CountryPickerModal } from '@/components/modals/country-picker';
+import { StorageLimitError } from '@/utils/storage-gate';
+import { UpgradePrompt } from '@/components/upgrade-prompt';
 
 export default function AccountSettingsScreen() {
   const colors = useColors();
   const { user, updateProfile, loading, error, setError } = useAuthStore();
-  const { currentMember, fetchFamilyForUser, uploadAvatar, getAvatarSignedUrl } = useFamilyStore();
+  const { family, currentMember, fetchFamilyForUser, uploadAvatar, getAvatarSignedUrl } = useFamilyStore();
 
   const [fullName, setFullName] = useState('');
   const [country, setCountry] = useState<string | null>(null);
@@ -26,6 +28,8 @@ export default function AccountSettingsScreen() {
   const [validationError, setValidationError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [initialLoading, setInitialLoading] = useState(true);
+  const [upgradePromptVisible, setUpgradePromptVisible] = useState(false);
+  const [upgradeReason, setUpgradeReason] = useState<'ai_feature' | 'storage_limit'>('ai_feature');
 
   useEffect(() => {
     const loadProfile = async () => {
@@ -57,7 +61,7 @@ export default function AccountSettingsScreen() {
   }, [currentMember?.avatar_url]);
 
   const handlePickAvatar = async () => {
-    if (!currentMember?.id) return;
+    if (!currentMember?.id || !family?.id || !user?.id) return;
 
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -72,10 +76,15 @@ export default function AccountSettingsScreen() {
       const asset = result.assets[0];
       const fileExt = asset.uri.split('.').pop();
       const fileName = `avatar.${fileExt}`;
-      await uploadAvatar(currentMember.id, asset.uri, asset.mimeType ?? 'image/jpeg', fileName);
+      await uploadAvatar(family.id, currentMember.id, user.id, asset.uri, asset.mimeType ?? 'image/jpeg', fileName);
 
       if (user?.id) await fetchFamilyForUser(user.id);
     } catch (err) {
+      if (err instanceof StorageLimitError) {
+        setUpgradePromptVisible(true);
+        setUpgradeReason('storage_limit');
+        return;
+      }
       console.error('Failed to upload avatar:', err);
       alert('Something went wrong uploading your photo.');
     } finally {
@@ -207,6 +216,12 @@ export default function AccountSettingsScreen() {
         selected={country}
         onSelect={setCountry}
         onClose={() => setCountryModalVisible(false)}
+      />
+
+      <UpgradePrompt
+        visible={upgradePromptVisible}
+        onClose={() => setUpgradePromptVisible(false)}
+        reason={upgradeReason}
       />
     </ScreenContainer>
   );

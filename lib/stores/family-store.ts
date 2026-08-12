@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { supabase } from '@/lib/_core/supabase';
 import { embedContent } from '../services/embed-content';
 import { notifyMember } from '../services/notify';
+import { checkStorageBeforeUpload, getFileSizeBytes, recordUpload, StorageLimitError } from '@/utils/storage-gate';
 
 export type MemberRole = 'admin' | 'coparent' | 'member' | 'child' | string;
 export type AgeBand = 'toddler' | 'child' | 'preteen' | 'teen' | 'adult' | string;
@@ -49,14 +50,19 @@ interface FamilyState {
   addMember: (familyId: string, member: Omit<Member, 'id' | 'family_id' | 'created_at' | 'updated_at'>) => Promise<void>;
   updateMember: (memberId: string, updates: Partial<Member>) => Promise<void>;
   removeMember: (memberId: string) => Promise<void>;
-  uploadAvatar: (memberId: string, fileUri: string, mimeType: string, fileName: string) => Promise<Family>;
+  uploadAvatar: (familyId: string, memberId: string, userId: string, fileUri: string, mimeType: string, fileName: string) => Promise<Family>;
   getAvatarSignedUrl: (storagePath: string) => Promise<string | null>;
-  uploadFamilyPhoto: (memberId: string, fileUri: string, mimeType: string, fileName: string) => Promise<Family>;
+  uploadFamilyPhoto: (familyId: string, userId: string, fileUri: string, mimeType: string, fileName: string) => Promise<Family>;
   getFamilyPhotoSignedUrl: (storagePath: string) => Promise<string | null>;
   updateFamilyName: (familyId: string,name: string) => Promise<void>;
   promoteMember: (memberId: string,familyId: string) => Promise<void>;
   demoteMember: (memberId: string,familyId: string) => Promise<void>;
   setError: (error: string | null) => void;
+
+  storageLimitError: StorageLimitError | null
+  upgradeRequired: boolean;
+  upgradeReason: 'ai_feature' | 'quota_exceeded' | null;
+  clearStorageLimitError: () => void;
   
 }
 
@@ -66,6 +72,12 @@ export const useFamilyStore = create<FamilyState>((set, get) => ({
   currentMember: null,
   loading: false,
   error: null,
+
+  upgradeRequired: false,
+  upgradeReason: null,
+  storageLimitError: null,
+
+  clearStorageLimitError: () => set({ storageLimitError: null }),
 
  fetchFamilyForUser: async (userId: string) => {
     set({ loading: true });
@@ -302,9 +314,12 @@ export const useFamilyStore = create<FamilyState>((set, get) => ({
     }
   },
 
-  uploadAvatar: async (memberId: string, fileUri: string, mimeType: string, fileName: string) => {
+  uploadAvatar: async (familyId: string, memberId: string,userId: string, fileUri: string, mimeType: string, fileName: string) => {
     set({ loading: true, error: null });
     try {
+      const fileSizeBytes = await getFileSizeBytes(fileUri);
+      await checkStorageBeforeUpload(familyId, fileSizeBytes);
+
       const storagePath = `${memberId}/${Date.now()}_${fileName}`;
 
       const formData = new FormData();
@@ -318,6 +333,11 @@ export const useFamilyStore = create<FamilyState>((set, get) => ({
         .from('member-avatars')
         .upload(storagePath, formData, { contentType: mimeType, upsert: false });
       if (uploadError) throw uploadError;
+
+      await recordUpload({
+          familyId, bucket: 'member-avatars', storagePath, sizeBytes: fileSizeBytes,
+          sourceType: 'avatar', createdBy: userId,
+      });
 
       const { data, error } = await supabase
         .from('member')
@@ -336,6 +356,10 @@ export const useFamilyStore = create<FamilyState>((set, get) => ({
 
       return data;
     } catch (error) {
+      if (error instanceof StorageLimitError) {
+        set({ storageLimitError: error, loading: false });
+        throw error;
+      }
       const message = error instanceof Error ? error.message : 'Failed to upload avatar';
       set({ error: message });
       throw error;
@@ -356,9 +380,12 @@ export const useFamilyStore = create<FamilyState>((set, get) => ({
     }
   },
 
-  uploadFamilyPhoto: async (familyId: string, fileUri: string, mimeType: string, fileName: string) => {
+  uploadFamilyPhoto: async (familyId: string, userId: string, fileUri: string, mimeType: string, fileName: string) => {
     set({ loading: true, error: null });
     try {
+      const fileSizeBytes = await getFileSizeBytes(fileUri);
+      await checkStorageBeforeUpload(familyId, fileSizeBytes);
+
       const storagePath = `${familyId}/${Date.now()}_${fileName}`;
 
       const formData = new FormData();
@@ -368,6 +395,11 @@ export const useFamilyStore = create<FamilyState>((set, get) => ({
         .from('family-photos')
         .upload(storagePath, formData, { contentType: mimeType, upsert: false });
       if (uploadError) throw uploadError;
+
+      await recordUpload({
+          familyId, bucket: 'family-memories', storagePath, sizeBytes: fileSizeBytes,
+          sourceType: 'family_photo', createdBy: userId,
+      });
 
       const { data, error } = await supabase
         .from('family')
@@ -380,6 +412,10 @@ export const useFamilyStore = create<FamilyState>((set, get) => ({
       set((state) => ({ family: state.family ? { ...state.family, photo_url: storagePath } : state.family, error: null }));
       return data;
     } catch (error) {
+      if (error instanceof StorageLimitError) {
+        set({ storageLimitError: error, loading: false });
+        throw error;
+      }
       const message = error instanceof Error ? error.message : 'Failed to upload family photo';
       set({ error: message });
       throw error;

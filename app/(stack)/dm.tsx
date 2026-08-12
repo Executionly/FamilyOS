@@ -8,6 +8,8 @@ import { useFamilyStore } from '@/lib/stores/family-store';
 import { useColors } from '@/hooks/use-colors';
 import { ScreenContainer } from '@/components/screen-container';
 import { AppHeader } from '@/components/app-header';
+import { UpgradePrompt } from '@/components/upgrade-prompt';
+import { StorageLimitError } from '@/utils/storage-gate';
 
 export default function DmThreadScreen() {
   const router = useRouter();
@@ -19,6 +21,8 @@ export default function DmThreadScreen() {
 
   const [input, setInput] = useState('');
   const listRef = useRef<FlatList>(null);
+  const [upgradePromptVisible, setUpgradePromptVisible] = useState(false);
+  const [upgradeReason, setUpgradeReason] = useState<'ai_feature' | 'storage_limit'>('ai_feature');
 
   const otherMember = members?.find((m) => m.user_id === otherUserId);
 
@@ -45,7 +49,16 @@ export default function DmThreadScreen() {
 
   const handleImagePick = () => {
     if (!family?.id || !user?.id || !otherUserId) return;
-    sendImage(family.id, user.id, otherUserId);
+    try{
+      sendImage(family.id, user.id, otherUserId);
+    }catch(error){
+      if (error instanceof StorageLimitError) {
+        setUpgradePromptVisible(true);
+        setUpgradeReason('storage_limit');
+        return;
+      }
+      alert('Something went wrong sending the image. Please try again.');
+    }
   };
 
   return (
@@ -132,6 +145,12 @@ export default function DmThreadScreen() {
           </Pressable>
         </View>
       </KeyboardAvoidingView>
+
+      <UpgradePrompt
+        visible={upgradePromptVisible}
+        onClose={() => setUpgradePromptVisible(false)}
+        reason={upgradeReason}
+      />
     </ScreenContainer>
   );
 }

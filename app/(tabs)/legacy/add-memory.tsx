@@ -12,6 +12,8 @@ import { useMemoriesStore } from '@/lib/stores/memories-store';
 import { useFamilyStore } from '@/lib/stores/family-store';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { useColors } from '@/hooks/use-colors';
+import { StorageLimitError, VideoLimitError } from '@/utils/storage-gate';
+import { UpgradePrompt } from '@/components/upgrade-prompt';
 
 type MemoryType = 'photo' | 'clip' | 'note';
 
@@ -38,23 +40,25 @@ export default function AddMemoryScreen() {
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [members, setMembers] = useState<{ id: string; name: string }[]>([]);
-    const [selectedTags, setSelectedTags] = useState<string[]>([]);
-
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [upgradePromptVisible, setUpgradePromptVisible] = useState(false);
+  const [upgradeReason, setUpgradeReason] = useState<'ai_feature' | 'storage_limit' | 'video_limit'>('ai_feature');
+  const [videoQuotaInfo, setVideoQuotaInfo] = useState<{ used: number; limit: number } | null>(null);
   const isBusy = loading || uploading;
 
-    useEffect(() => {
-        if (family?.id) {
-            fetchFamilyMembers(family.id).then(setMembers).catch(() => {});
-        }
-    }, [family?.id]);
+  useEffect(() => {
+      if (family?.id) {
+          fetchFamilyMembers(family.id).then(setMembers).catch(() => {});
+      }
+  }, [family?.id]);
 
-    const toggleTag = (memberId: string) => {
-        setSelectedTags((prev) =>
-            prev.includes(memberId)
-            ? prev.filter((t) => t !== memberId)
-            : [...prev, memberId]
-        );
-    };
+  const toggleTag = (memberId: string) => {
+      setSelectedTags((prev) =>
+          prev.includes(memberId)
+          ? prev.filter((t) => t !== memberId)
+          : [...prev, memberId]
+      );
+  };
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
@@ -127,9 +131,11 @@ export default function AddMemoryScreen() {
       if (pickedFile) {
         storagePath = await uploadMemoryMedia(
           family.id,
+          user.id,
           pickedFile.uri,
           pickedFile.mimeType,
           pickedFile.fileName,
+          memoryType === 'clip' ? 'video' : 'photo'
         );
       }
 
@@ -145,6 +151,17 @@ export default function AddMemoryScreen() {
 
       router.back();
     } catch (err) {
+      if (err instanceof VideoLimitError) {
+        setUpgradePromptVisible(true);
+        setUpgradeReason('video_limit');
+        setVideoQuotaInfo({ used: err.videosUsed, limit: err.videoLimit });
+        return;
+      }
+      if (err instanceof StorageLimitError) {
+        setUpgradePromptVisible(true);
+        setUpgradeReason('storage_limit');
+        return;
+      }
       setError(err instanceof Error ? err.message : 'Failed to save memory.');
     }
   };
@@ -394,6 +411,14 @@ export default function AddMemoryScreen() {
             )}
           </Pressable>
         </View>
+
+        <UpgradePrompt
+          visible={upgradePromptVisible}
+          onClose={() => setUpgradePromptVisible(false)}
+          reason={upgradeReason}
+          videoLimit={videoQuotaInfo?.limit}
+          videosUsed={videoQuotaInfo?.used}
+        />
     </ScreenContainer>
   );
 }

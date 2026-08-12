@@ -21,20 +21,25 @@ import { Animated } from 'react-native';
 import Markdown from 'react-native-markdown-display';
 import { ActionCard } from '@/components/ActionCard';
 import { markdownStyles } from '@/utils';
+import { UpgradePrompt } from '@/components/upgrade-prompt';
+import { useSubscriptionStore } from '@/lib/stores/subscription-store';
 
 export default function FamilyChatScreen() {
   const router = useRouter();
   const colors = useColors();
   const { user } = useAuthStore();
   const { family } = useFamilyStore();
-  const { messages, loading, sending, error, 
-    loadMessages, sendMessage, subscribeToChat, 
-    unsubscribe, pendingActionsByMessageId, resolveAction } =
-    useFamilyChatStore();
-
-
+  const { tier, aiIntroUsed } = useSubscriptionStore();
+  const {
+    messages, loading, sending, error, pendingActionsByMessageId,
+    upgradeRequired, upgradeReason, clearUpgradePrompt,
+    loadMessages, sendMessage, subscribeToChat, unsubscribe,
+    dismissIntroWrapUp, showIntroWrapUp
+  } = useFamilyChatStore();
   const [input, setInput] = useState('');
   const listRef = useRef<FlatList>(null);
+
+  const showIntroBanner = tier === 'free' && !aiIntroUsed && messages.length === 0;
 
   useEffect(() => {
     if (!family?.id) return;
@@ -71,7 +76,17 @@ export default function FamilyChatScreen() {
           <Text className="text-xs text-muted">Ask me anything about your family</Text>
         </View>
       </View>
-
+      {showIntroBanner && (
+        <View className="mx-4 mt-3 rounded-2xl border border-primary/30 bg-primary/5 p-3.5">
+          <View className="flex-row items-center gap-2">
+            <Ionicons name="sparkles" size={16} color={colors.primary} />
+            <Text className="text-xs font-bold text-primary">Free Preview</Text>
+          </View>
+          <Text className="mt-1.5 text-xs leading-4 text-foreground">
+            Ask me anything about your family — I'll use your real schedule, tasks, and details. This is your one-time free preview of Fambound AI.
+          </Text>
+        </View>
+      )}
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 40 : 0}
@@ -112,25 +127,6 @@ export default function FamilyChatScreen() {
                   </View>
 
                   {/* Approval cards for actions attached to this message */}
-                  {/* {pendingActionsByMessageId[item.id]?.filter((a) => a.status === 'pending').map((action) => (
-                    <View key={action.id} className="mt-2 rounded-2xl border border-primary bg-primary/5 p-3.5">
-                      <Text className="mb-3 text-sm text-foreground">{action.summary}</Text>
-                      <View className="flex-row gap-2">
-                        <Pressable
-                          onPress={() => resolveAction(action.id, 'rejected', user!.id)}
-                          className="flex-1 items-center rounded-lg border border-border py-2"
-                        >
-                          <Text className="text-xs font-semibold text-muted">Skip</Text>
-                        </Pressable>
-                        <Pressable
-                          onPress={() => resolveAction(action.id, 'approved', user!.id)}
-                          className="flex-1 items-center rounded-lg bg-primary py-2"
-                        >
-                          <Text className="text-xs font-bold text-white">Approve</Text>
-                        </Pressable>
-                      </View>
-                    </View>
-                  ))} */}
                   {pendingActionsByMessageId[item.id]?.filter((a) => a.status === 'pending').map((action) => (
                     <ActionCard key={action.id} action={action} />
                   ))}
@@ -143,6 +139,30 @@ export default function FamilyChatScreen() {
               )
             }
           />
+        )}
+
+         {/* Intro wrap-up card — appears right after the free preview reply */}
+        {showIntroWrapUp && (
+          <View className="mx-4 mb-3 rounded-2xl border border-primary/30 bg-primary/5 p-4">
+            <View className="flex-row items-center gap-2">
+              <Ionicons name="sparkles" size={16} color={colors.primary} />
+              <Text className="text-sm font-bold text-foreground">That's Fambound AI</Text>
+            </View>
+            <Text className="mt-1.5 text-xs leading-5 text-muted">
+              Imagine that for everything — scheduling, meal planning, meeting prep, and more. Upgrade to keep the conversation going.
+            </Text>
+            <View className="mt-3 flex-row gap-2">
+              <Pressable onPress={dismissIntroWrapUp} className="flex-1 items-center rounded-xl border border-border py-2.5">
+                <Text className="text-xs font-semibold text-muted">Maybe later</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => { dismissIntroWrapUp(); router.push('/paywall'); }}
+                className="flex-1 items-center rounded-xl bg-primary py-2.5"
+              >
+                <Text className="text-xs font-bold text-white">Upgrade Now</Text>
+              </Pressable>
+            </View>
+          </View>
         )}
 
         {error && (
@@ -176,6 +196,11 @@ export default function FamilyChatScreen() {
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
+       <UpgradePrompt
+        visible={upgradeRequired}
+        onClose={clearUpgradePrompt}
+        reason={upgradeReason ?? 'ai_feature'}
+      />
     </ScreenContainer>
   );
 }

@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { supabase } from '@/lib/_core/supabase';
 import { notifyAssignment, notifyFamily } from '../services/notify';
 import { embedContent } from '../services/embed-content';
+import { checkStorageBeforeUpload, checkVideoQuota, getFileSizeBytes, recordUpload, StorageLimitError, VideoLimitError } from '@/utils/storage-gate';
 
 
 export interface Memory {
@@ -29,9 +30,11 @@ interface MemoriesState {
   deleteMemory: (id: string) => Promise<void>;
   uploadMemoryMedia: (
     familyId: string,
+    userId: string,
     fileUri: string,
     mimeType: string,
     fileName: string,
+    mediaType: 'photo' | 'video'
   ) => Promise<string>; // returns the storage path
   getSignedUrl: (storagePath: string) => Promise<string | null>;
 }
@@ -194,9 +197,16 @@ export const useMemoriesStore = create<MemoriesState>((set) => ({
     }
   },
 
-  uploadMemoryMedia: async (familyId, fileUri, mimeType, fileName) => {
+  uploadMemoryMedia: async (familyId, fileUri,userId, mimeType, fileName, mediaType: 'photo' | 'video') => {
     set({ uploading: true });
     try {
+      const fileSizeBytes = await getFileSizeBytes(fileUri);
+      await checkStorageBeforeUpload(familyId, fileSizeBytes);
+
+      if (mediaType === 'video') {
+        await checkVideoQuota(familyId); // separate check, video-specific
+      }
+
       const storagePath = `${familyId}/${Date.now()}_${fileName}`;
 
       const formData = new FormData();
@@ -214,8 +224,17 @@ export const useMemoriesStore = create<MemoriesState>((set) => ({
         });
 
       if (error) throw error;
+      await recordUpload({
+        familyId, bucket: 'family-memories', storagePath, sizeBytes: fileSizeBytes,
+        sourceType: 'memory', createdBy: userId,
+      });
+
       return storagePath;
     } catch (error) {
+       if (error instanceof StorageLimitError || error instanceof VideoLimitError) {
+        set({ uploading: false });
+        throw error;
+      }
       const message = error instanceof Error ? error.message : 'Failed to upload media';
       set({ error: message });
       throw error;

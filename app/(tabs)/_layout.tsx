@@ -9,6 +9,9 @@ import { Ionicons } from "@expo/vector-icons";
 import { useFamilyRealtime } from "@/hooks/use-family-realtime";
 import { useFamilyStore } from "@/lib/stores/family-store";
 import { useAuthStore } from "@/lib/stores/auth-store";
+import { useEffect } from "react";
+import { initPurchases } from "@/lib/purchases";
+import { useSubscriptionStore } from "@/lib/stores/subscription-store";
 
 export default function TabLayout() {
   const colors = useColors();
@@ -18,6 +21,13 @@ export default function TabLayout() {
 
   const { family } = useFamilyStore();
   const { user } = useAuthStore();
+
+  useEffect(() => {
+    if (family?.id) {
+      initPurchases(family.id);
+      useSubscriptionStore.getState().fetchSubscription(family.id);
+    }
+  }, [family?.id]);
 
   useFamilyRealtime(family?.id, user?.id);
 

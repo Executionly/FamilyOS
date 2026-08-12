@@ -6,6 +6,7 @@ import { ScreenContainer } from '@/components/screen-container';
 import { useColors } from '@/hooks/use-colors';
 import { useFamilyStore } from '@/lib/stores/family-store';
 import { getOfferings, purchasePackage, restorePurchases } from '@/lib/purchases';
+import { useSubscriptionStore } from '@/lib/stores/subscription-store';
 
 const FEATURES = [
   { icon: 'sparkles', text: 'AI Family Assistant that manages your calendar, tasks & more' },
@@ -26,6 +27,8 @@ export default function PaywallScreen() {
   const [loading, setLoading] = useState(true);
   const [purchasing, setPurchasing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState(false);
+
 
   useEffect(() => {
     (async () => {
@@ -45,19 +48,34 @@ export default function PaywallScreen() {
   }, []);
 
   const handlePurchase = async () => {
-    if (!selectedPackage) return;
+    if (!selectedPackage || !family?.id) return;
     setPurchasing(true);
     setError(null);
     try {
       await purchasePackage(selectedPackage);
-      // family.subscription_tier updates via the RevenueCat webhook — give it a moment, then close
-      router.back();
+
+      // Purchase succeeded on-device — now wait for the webhook to actually
+      // land and flip subscription_tier before treating this as "done"
+      setPurchasing(false);
+      setConfirming(true);
+
+      const confirmed = await useSubscriptionStore.getState().pollUntilPremium(family.id);
+
+      setConfirming(false);
+
+      if (confirmed) {
+        router.back();
+      } else {
+        // Purchase went through on RevenueCat's side, but our webhook hasn't
+        // reflected it yet — don't block the user, just let them know
+        setError("Your purchase went through — it may take a moment to fully activate. You're all set, just give it a minute.");
+      }
     } catch (err: any) {
+      setPurchasing(false);
+      setConfirming(false);
       if (!err?.userCancelled) {
         setError('Purchase failed. Please try again.');
       }
-    } finally {
-      setPurchasing(false);
     }
   };
 
@@ -158,10 +176,19 @@ export default function PaywallScreen() {
 
         <Pressable
           onPress={handlePurchase}
-          disabled={purchasing || !selectedPackage}
+          disabled={purchasing || confirming || !selectedPackage}
           className="items-center rounded-2xl bg-primary py-4"
         >
-          {purchasing ? <ActivityIndicator color="#fff" /> : <Text className="text-base font-bold text-white">Upgrade to Premium</Text>}
+          {purchasing || confirming ? (
+            <View className="flex-row items-center gap-2">
+              <ActivityIndicator color="#fff" />
+              <Text className="text-sm font-semibold text-white">
+                {confirming ? 'Confirming your subscription...' : 'Processing...'}
+              </Text>
+            </View>
+          ) : (
+            <Text className="text-base font-bold text-white">Upgrade to Premium</Text>
+          )}
         </Pressable>
 
         <Pressable onPress={handleRestore} disabled={purchasing} className="mt-4 items-center">

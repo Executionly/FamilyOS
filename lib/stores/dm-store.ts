@@ -3,6 +3,7 @@ import { supabase } from '@/lib/_core/supabase';
 import { getConversationId } from '@/utils';
 import { notifyMember } from '../services/notify';
 import { useToastStore } from './toast-store';
+import { checkStorageBeforeUpload, getFileSizeBytes, recordUpload, StorageLimitError } from '@/utils/storage-gate';
 
 export interface DirectMessage {
   id: string;
@@ -58,6 +59,11 @@ interface DmState {
   unsubscribeFromInbox: () => void;
   subscribeToToasts: (myUserId: string, familyId: string) => void;
   unsubscribeFromToasts: () => void;
+
+  storageLimitError: StorageLimitError | null
+  upgradeRequired: boolean;
+  upgradeReason: 'ai_feature' | 'quota_exceeded' | null;
+  clearStorageLimitError: () => void;
 }
 
 export const useDmStore = create<DmState>((set, get) => ({
@@ -70,6 +76,12 @@ export const useDmStore = create<DmState>((set, get) => ({
   channel: null,
   inboxChannel: null,
   toastChannel: null,
+
+  upgradeRequired: false,
+  upgradeReason: null,
+  storageLimitError: null,
+
+  clearStorageLimitError: () => set({ storageLimitError: null }),
 
   loadConversations: async (familyId: string, myUserId: string, silent = false) => {
     if (!silent) set({ loadingConversations: true, error: null });
@@ -222,6 +234,10 @@ export const useDmStore = create<DmState>((set, get) => ({
       const fileExt = asset.uri.split('.').pop();
       const fileName = `image_${Date.now()}.${fileExt}`;
       const mimeType = asset.mimeType ?? 'image/jpeg';
+
+      const fileSizeBytes = await getFileSizeBytes(asset.uri);
+      await checkStorageBeforeUpload(familyId, fileSizeBytes);
+
       const conversationId = getConversationId(myUserId, otherUserId);
       const storagePath = `${conversationId}/${Date.now()}_${fileName}`;
 
@@ -232,6 +248,11 @@ export const useDmStore = create<DmState>((set, get) => ({
         .from('dm-images')
         .upload(storagePath, formData, { contentType: mimeType, upsert: false });
       if (uploadError) throw uploadError;
+
+      await recordUpload({
+          familyId, bucket: 'dm-images', storagePath, sizeBytes: fileSizeBytes,
+          sourceType: 'dm', createdBy: myUserId,
+      });
 
       const { error } = await supabase.from('direct_message').insert([{
         family_id: familyId,
@@ -258,6 +279,10 @@ export const useDmStore = create<DmState>((set, get) => ({
         });
       }
     } catch (error) {
+       if (error instanceof StorageLimitError) {
+        set({ storageLimitError: error, sending: false });
+        return;
+      }
       set({ error: error instanceof Error ? error.message : 'Failed to send image' });
     } finally {
       set({ sending: false });

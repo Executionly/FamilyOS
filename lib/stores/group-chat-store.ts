@@ -3,6 +3,7 @@ import { supabase } from '@/lib/_core/supabase';
 import * as ImagePicker from 'expo-image-picker';
 import { notifyFamily } from '../services/notify';
 import { useToastStore } from './toast-store';
+import { checkStorageBeforeUpload, getFileSizeBytes, recordUpload, StorageLimitError } from '@/utils/storage-gate';
 
 
 async function getSignedImageUrl(path: string): Promise<string | null> {
@@ -44,6 +45,11 @@ interface GroupChatState {
     subscribeToToasts: (familyId: string, myUserId: string) => void;
     unsubscribe: () => void;
     unsubscribeFromToasts: () => void;
+
+    storageLimitError: StorageLimitError | null
+    upgradeRequired: boolean;
+    upgradeReason: 'ai_feature' | 'quota_exceeded' | null;
+    clearStorageLimitError: () => void;
 }
 
 export const useGroupChatStore = create<GroupChatState>((set, get) => ({
@@ -53,6 +59,11 @@ export const useGroupChatStore = create<GroupChatState>((set, get) => ({
     error: null,
     channel: null,
     toastChannel: null,
+    upgradeRequired: false,
+    upgradeReason: null,
+    storageLimitError: null,
+
+    clearStorageLimitError: () => set({ storageLimitError: null }),
 
     subscribeToToasts: (familyId: string, myUserId: string) => {
     const channel = supabase
@@ -180,13 +191,16 @@ export const useGroupChatStore = create<GroupChatState>((set, get) => ({
             const mimeType = asset.mimeType ?? 'image/jpeg';
             const storagePath = `${familyId}/${Date.now()}_${fileName}`;
 
+            const fileSizeBytes = await getFileSizeBytes(asset.uri);
+            await checkStorageBeforeUpload(familyId, fileSizeBytes);
+
             const formData = new FormData();
             formData.append('file', {
                 uri: asset.uri,
                 name: fileName,
                 type: mimeType,
             } as any);
-
+            
             const { error: uploadError } = await supabase.storage
             .from('chat-images')
             .upload(storagePath, formData, {
@@ -194,6 +208,11 @@ export const useGroupChatStore = create<GroupChatState>((set, get) => ({
                 upsert: false,
             });
             if (uploadError) throw uploadError;
+
+            await recordUpload({
+                familyId, bucket: 'chat-images', storagePath, sizeBytes: fileSizeBytes,
+                sourceType: 'group_chat', createdBy: senderId,
+            });
 
             const { error } = await supabase.from('family_group_chat_messages').insert([{
                 family_id: familyId, sender_id: senderId, image_path: storagePath,
@@ -211,6 +230,10 @@ export const useGroupChatStore = create<GroupChatState>((set, get) => ({
                 excludeUserId: senderId,
             });
         } catch (error) {
+             if (error instanceof StorageLimitError) {
+                set({ storageLimitError: error, sending: false });
+                return;
+            }
             set({ error: error instanceof Error ? error.message : 'Failed to send image' });
         } finally {
             set({ sending: false });

@@ -6,9 +6,11 @@ import { useColors } from '@/hooks/use-colors';
 interface UpgradePromptProps {
   visible: boolean;
   onClose: () => void;
-  reason: 'ai_feature' | 'storage_limit' | 'quota_exceeded';
+  reason: 'ai_feature' | 'storage_limit' | 'quota_exceeded' | 'video_limit';
   usedBytes?: number;
   limitBytes?: number;
+  videoLimit?: number;
+  videosUsed?: number;
 }
 
 const COPY: Record<UpgradePromptProps['reason'], { title: string; body: string }> = {
@@ -24,9 +26,13 @@ const COPY: Record<UpgradePromptProps['reason'], { title: string; body: string }
     title: "You've reached your storage limit",
     body: 'Upgrade to Premium for unlimited photo and memory storage.',
   },
+   video_limit: {
+    title: "You've reached your free video limit",
+    body: 'Free accounts can save up to 3 videos. Upgrade to Premium for unlimited video memories.',
+  },
 };
 
-export function UpgradePrompt({ visible, onClose, reason, usedBytes, limitBytes }: UpgradePromptProps) {
+export function UpgradePrompt({ visible, onClose, reason, usedBytes, limitBytes,videosUsed,videoLimit }: UpgradePromptProps) {
   const router = useRouter();
   const colors = useColors();
   const copy = COPY[reason];
@@ -44,6 +50,11 @@ export function UpgradePrompt({ visible, onClose, reason, usedBytes, limitBytes 
           {reason === 'storage_limit' && limitBytes && (
             <Text className="mt-2 text-xs text-muted">
               {Math.round((usedBytes ?? 0) / 1024 / 1024)}MB of {Math.round(limitBytes / 1024 / 1024)}MB used
+            </Text>
+          )}
+          {reason === 'video_limit' && videoLimit && (
+            <Text className="mt-2 text-xs text-muted">
+              {videosUsed ?? 0} of {videoLimit} videos used
             </Text>
           )}
 

@@ -1,8 +1,7 @@
-// supabase/functions/family-ai-briefing/index.ts
 import { serve } from 'https://deno.land/std@0.190.0/http/server.ts';
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { TOOLS, AUTO_EXECUTE_TOOLS } from '../family-ai-chat/tools.ts';
-import { checkAiEntitlement, recordAiUsage } from '../_shared/entitlement.ts';
+import { checkAiEntitlement, recordAiUsage } from '../_shared/entitlements.ts';
 
 const DEEPSEEK_API_KEY = Deno.env.get('DEEPSEEK_API_KEY')!;
 const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);

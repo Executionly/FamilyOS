@@ -9,6 +9,7 @@ import { useMeetingStore } from '@/lib/stores/meeting-store';
 import { useCommitmentStore } from '@/lib/stores/commitment-store';
 import { generateMeetingSummary } from '@/lib/services/meeting-ai';
 import { AppHeader } from '@/components/app-header';
+import { UpgradePrompt } from '@/components/upgrade-prompt';
 
 export default function RunMeetingScreen() {
   const router = useRouter();
@@ -24,6 +25,9 @@ export default function RunMeetingScreen() {
   const [decisionNotes, setDecisionNotes] = useState('');
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
   const [sessionCommitments, setSessionCommitments] = useState<string[]>([]);
+  const [upgradePromptVisible, setUpgradePromptVisible] = useState(false);
+  const [upgradeReason, setUpgradeReason] = useState<'ai_feature' | 'quota_exceeded'>('ai_feature');
+
 
   // Keep screen awake during meeting
   useEffect(() => {
@@ -78,12 +82,20 @@ export default function RunMeetingScreen() {
         sessionCommitments,
       );
 
+      if (result.upgradeReason) {
+        setUpgradeReason(result.upgradeReason);
+        setUpgradePromptVisible(true);
+        return;
+      }
+
       if (result.success) {
         // Update meeting status to completed
         await updateMeeting(meetingId, { status: 'completed' });
 
         // Navigate to summary screen
         router.push(`/meetings/summary?meetingId=${meetingId}`);
+      }else{
+        alert('Failed to generate summary. Please try again.');
       }
     } catch (error) {
       console.error('Error generating summary:', error);
@@ -294,6 +306,12 @@ export default function RunMeetingScreen() {
         </View>
  
       </ScrollView>
+
+      <UpgradePrompt
+        visible={upgradePromptVisible}
+        onClose={() => setUpgradePromptVisible(false)}
+        reason={upgradeReason}
+      />
     </ScreenContainer>
   );
 }

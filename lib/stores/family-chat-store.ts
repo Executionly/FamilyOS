@@ -35,6 +35,9 @@ interface FamilyChatState {
   upgradeRequired: boolean;
   upgradeReason: 'ai_feature' | 'quota_exceeded' | null;
   clearUpgradePrompt: () => void;
+
+  showIntroWrapUp: boolean;
+  dismissIntroWrapUp: () => void;
 }
 
 export const useFamilyChatStore = create<FamilyChatState>((set, get) => ({
@@ -47,6 +50,9 @@ export const useFamilyChatStore = create<FamilyChatState>((set, get) => ({
 
   upgradeRequired: false,
   upgradeReason: null,
+
+  showIntroWrapUp: false,
+  dismissIntroWrapUp: () => set({ showIntroWrapUp: false }),
 
   clearUpgradePrompt: () => set({ upgradeRequired: false, upgradeReason: null }),
 
@@ -132,6 +138,9 @@ export const useFamilyChatStore = create<FamilyChatState>((set, get) => ({
               [data.message_id]: data.pending_actions,
             },
           }));
+        }
+        if (data?.was_intro) {
+          set({ showIntroWrapUp: true });
         }
     } catch (err) {
         set({ error: err instanceof Error ? err.message : 'Failed to send message' });

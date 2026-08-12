@@ -9,6 +9,8 @@ import { useColors } from '@/hooks/use-colors';
 import { ScreenContainer } from '@/components/screen-container';
 import ImageView from "react-native-image-viewing";
 import { useDmStore } from '@/lib/stores/dm-store';
+import { StorageLimitError } from '@/utils/storage-gate';
+import { UpgradePrompt } from '@/components/upgrade-prompt';
 
 
 export default function GroupChatScreen() {
@@ -22,11 +24,13 @@ export default function GroupChatScreen() {
     const [input, setInput] = useState('');
     const listRef = useRef<FlatList>(null);
     const { conversations } = useDmStore();
+    const [upgradePromptVisible, setUpgradePromptVisible] = useState(false);
+    const [upgradeReason, setUpgradeReason] = useState<'ai_feature' | 'storage_limit'>('ai_feature');
     
-      const totalUnread = useMemo(
-        () => conversations.reduce((sum, c) => sum + (c.unread_count || 0), 0),
-        [conversations]
-      );
+    const totalUnread = useMemo(
+      () => conversations.reduce((sum, c) => sum + (c.unread_count || 0), 0),
+      [conversations]
+    );
 
     useEffect(() => {
         if (!family?.id) return;
@@ -49,8 +53,17 @@ export default function GroupChatScreen() {
     };
 
     const handleImagePick = () => {
-        if (!family?.id || !user?.id) return;
+      if (!family?.id || !user?.id) return;
+      try {
         sendImage(family.id, user.id);
+      } catch (error) {
+        if (error instanceof StorageLimitError) {
+          setUpgradePromptVisible(true);
+          setUpgradeReason('storage_limit');
+          return;
+        }
+        alert('Something went wrong sending the image. Please try again.');
+      }
     };
 
   return (
@@ -184,6 +197,12 @@ export default function GroupChatScreen() {
         imageIndex={0}
         visible={visible}
         onRequestClose={() => setVisible(false)}
+      />
+
+      <UpgradePrompt
+        visible={upgradePromptVisible}
+        onClose={() => setUpgradePromptVisible(false)}
+        reason={upgradeReason}
       />
     </ScreenContainer>
   );

@@ -7,9 +7,13 @@ import { AppHeader } from '@/components/app-header';
 import { useColors } from '@/hooks/use-colors';
 import { useFamilyStore } from '@/lib/stores/family-store';
 import { isAdminAccess } from '@/utils';
+import { StorageLimitError } from '@/utils/storage-gate';
+import { UpgradePrompt } from '@/components/upgrade-prompt';
+import { useAuthStore } from '@/lib/stores/auth-store';
 
 export default function FamilySettingsScreen() {
     const colors = useColors();
+    const {user} = useAuthStore()
     const { family, uploadFamilyPhoto, getFamilyPhotoSignedUrl, updateFamilyName, loading, error, currentMember} = useFamilyStore();
 
     const [name, setName] = useState(family?.name ?? '');
@@ -17,6 +21,8 @@ export default function FamilySettingsScreen() {
     const [uploadingPhoto, setUploadingPhoto] = useState(false);
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
     const [validationError, setValidationError] = useState<string | null>(null);
+    const [upgradePromptVisible, setUpgradePromptVisible] = useState(false);
+    const [upgradeReason, setUpgradeReason] = useState<'ai_feature' | 'storage_limit'>('ai_feature');
 
     const isAdmin = isAdminAccess(currentMember?.role)
 
@@ -31,7 +37,7 @@ export default function FamilySettingsScreen() {
     }, [family?.photo_url]);
 
     const handlePickPhoto = async () => {
-        if (!family?.id) return;
+        if (!family?.id || !user?.id) return;
         const result = await ImagePicker.launchImageLibraryAsync({
             mediaTypes: ImagePicker.MediaTypeOptions.Images,
             quality: 0.7,
@@ -45,8 +51,13 @@ export default function FamilySettingsScreen() {
             const asset = result.assets[0];
             const fileExt = asset.uri.split('.').pop();
             const fileName = `cover.${fileExt}`;
-            await uploadFamilyPhoto(family.id, asset.uri, asset.mimeType ?? 'image/jpeg', fileName);
+            await uploadFamilyPhoto(family.id, user?.id, asset.uri, asset.mimeType ?? 'image/jpeg', fileName);
         } catch (err) {
+          if (err instanceof StorageLimitError) {
+            setUpgradePromptVisible(true);
+            setUpgradeReason('storage_limit');
+            return;
+          }
             console.error('Failed to upload family photo:', err);
             alert('Something went wrong uploading the photo.');
         } finally {
@@ -129,6 +140,12 @@ export default function FamilySettingsScreen() {
           {loading ? <ActivityIndicator color="#fff" /> : <Text className="font-bold text-white">Save</Text>}
         </Pressable>
       </View>
+
+      <UpgradePrompt
+        visible={upgradePromptVisible}
+        onClose={() => setUpgradePromptVisible(false)}
+        reason={upgradeReason}
+      />
     </ScreenContainer>
   );
 }

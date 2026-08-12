@@ -1,7 +1,7 @@
 import { serve } from 'https://deno.land/std@0.190.0/http/server.ts';
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { TOOLS, AUTO_EXECUTE_TOOLS } from './tools.ts';
-import { checkAiEntitlement, recordAiUsage } from '../_shared/entitlement.ts';
+import { checkAiEntitlement, recordAiUsage } from '../_shared/entitlements.ts';
 
 const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY')!;
 const DEEPSEEK_API_KEY = Deno.env.get('DEEPSEEK_API_KEY')!;
@@ -328,6 +328,7 @@ If asked about something unrelated to this family, gently steer the conversation
       message_id: assistantMsgId,
       pending_actions: pendingActions,
       auto_executed: autoExecutedSummaries,
+      was_intro: entitlement.isIntro ?? false, 
     }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },

@@ -8,6 +8,7 @@ import { useFamilyStore } from '@/lib/stores/family-store';
 import { useMeetingStore } from '@/lib/stores/meeting-store';
 import { generateMeetingAgenda } from '@/lib/services/meeting-ai';
 import { AppHeader } from '@/components/app-header';
+import { UpgradePrompt } from '@/components/upgrade-prompt';
 
 export default function MeetingSetupScreen() {
   const router = useRouter();
@@ -26,6 +27,9 @@ export default function MeetingSetupScreen() {
   const [frequency, setFrequency] = useState<'once' | 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'bimonthly' | 'quaterly' | 'annually'>('weekly');
   const [meetingLink, setMeetingLink] = useState('');
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [upgradePromptVisible, setUpgradePromptVisible] = useState(false);
+  const [upgradeReason, setUpgradeReason] = useState<'ai_feature' | 'quota_exceeded'>('ai_feature');
+
 
   const handleDateChange = (event: any, date?: Date) => {
     if (date) setSelectedDate(date);
@@ -61,8 +65,16 @@ export default function MeetingSetupScreen() {
     setIsGenerating(true);
     try {
       setGeneratingMessage('Reviewing your commitments...');
-      
-      const result = await generateMeetingAgenda(family.id,duration,);
+
+      const result = await generateMeetingAgenda(family.id, duration);
+
+      if (result.upgradeReason) {
+        setIsGenerating(false);
+        setGeneratingMessage('');
+        setUpgradeReason(result.upgradeReason);
+        setUpgradePromptVisible(true);
+        return;
+      }
 
       if (!result.success) {
         throw new Error('Failed to generate agenda');
@@ -98,7 +110,6 @@ export default function MeetingSetupScreen() {
 
       setGeneratingMessage('');
       router.replace('/(tabs)/meetings');
-      // router.push(`/meetings/run?meetingId=${meeting.id}`);
     } catch (error) {
       console.error('Error generating agenda:', error);
       setGeneratingMessage('');
@@ -274,6 +285,11 @@ export default function MeetingSetupScreen() {
           </Pressable>
         </View>
       </ScrollView>
+      <UpgradePrompt
+        visible={upgradePromptVisible}
+        onClose={() => setUpgradePromptVisible(false)}
+        reason={upgradeReason}
+      />
     </ScreenContainer>
   );
 }

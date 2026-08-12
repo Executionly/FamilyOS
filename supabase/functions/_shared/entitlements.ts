@@ -3,7 +3,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 const MONTHLY_AI_QUOTA_PREMIUM = 500; // adjust to whatever "generous" means in practice — start conservative, tune from real usage data
 const FREE_INTRO_QUOTA = 1; // the one-time guided intro
 const FREE_STORAGE_LIMIT_BYTES = 500 * 1024 * 1024; // 500MB — adjust once you know real costs
-
+const FREE_VIDEO_LIMIT = 3;
 
 export async function checkAiEntitlement(
   supabase: ReturnType<typeof createClient>,
@@ -87,4 +87,37 @@ export async function checkStorageEntitlement(
   }
 
   return { allowed: true, usedBytes: family.storage_used_bytes ?? 0, limitBytes: FREE_STORAGE_LIMIT_BYTES };
+}
+
+
+export async function checkVideoEntitlement(
+  supabase: ReturnType<typeof createClient>,
+  familyId: string
+): Promise<{ allowed: boolean; reason?: string; videosUsed?: number; videoLimit?: number }> {
+  const { data: family } = await supabase
+    .from('family')
+    .select('subscription_tier, subscription_expires_at')
+    .eq('id', familyId)
+    .single();
+
+  if (!family) return { allowed: false, reason: 'Family not found' };
+
+  const isPremium =
+    family.subscription_tier === 'premium' &&
+    (!family.subscription_expires_at || new Date(family.subscription_expires_at) > new Date());
+
+  if (isPremium) return { allowed: true };
+
+  const { count } = await supabase
+    .from('memory')
+    .select('id', { count: 'exact', head: true })
+    .eq('family_id', familyId)
+    .eq('media_type', 'video');
+
+  const videosUsed = count ?? 0;
+  if (videosUsed >= FREE_VIDEO_LIMIT) {
+    return { allowed: false, reason: 'video_limit_exceeded', videosUsed, videoLimit: FREE_VIDEO_LIMIT };
+  }
+
+  return { allowed: true, videosUsed, videoLimit: FREE_VIDEO_LIMIT };
 }
