@@ -18,6 +18,15 @@ const MAPPING = {
   "paperplane.fill": "send",
   "chevron.left.forwardslash.chevron.right": "code",
   "chevron.right": "chevron-right",
+  // Added for your Meetings tab screen
+  "person.3.fill": "groups", 
+  
+  // Added for your Legacy tab screen
+  "photo.fill": "image", 
+
+  "ellipsis": "more-horiz",              // Three horizontal dots (...)
+  "ellipsis.circle.fill": "more-vert",    // Three vertical dots inside a column layout
+  "line.3.horizontal": "menu",
 } as IconMapping;
 
 /**

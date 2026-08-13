@@ -23,8 +23,11 @@ import { ActionCard } from '@/components/ActionCard';
 import { markdownStyles } from '@/utils';
 import { UpgradePrompt } from '@/components/upgrade-prompt';
 import { useSubscriptionStore } from '@/lib/stores/subscription-store';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 
 export default function FamilyChatScreen() {
+  const insets = useSafeAreaInsets();
   const router = useRouter();
   const colors = useColors();
   const { user } = useAuthStore();
@@ -88,9 +91,9 @@ export default function FamilyChatScreen() {
         </View>
       )}
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 40 : 0}
-        className="flex-1"
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 50 : 0}
+        style={{ flex: 1 }}
       >
         {loading ? (
           <View className="flex-1 items-center justify-center">
@@ -172,7 +175,8 @@ export default function FamilyChatScreen() {
         )}
 
         {/* Input bar */}
-        <View className="flex-row items-center px-4 py-3 border-t mb-7 border-border bg-background">
+        <View className="flex-row items-center px-4 py-3 border-t border-border bg-background"
+        style={{ paddingBottom: Math.max(insets.bottom, 12) }}>
           <TextInput
             placeholder="Message your family AI..."
             placeholderTextColor={colors.muted}

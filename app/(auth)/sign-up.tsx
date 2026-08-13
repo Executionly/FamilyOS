@@ -1,13 +1,16 @@
 import { useState } from 'react';
-import { ScrollView, Text, View, TextInput, Pressable, ActivityIndicator, TouchableOpacity } from 'react-native';
+import { ScrollView, Text, View, TextInput, Pressable, ActivityIndicator, TouchableOpacity, Platform,KeyboardAvoidingView } from 'react-native';
 import { Link, useRouter } from 'expo-router';
 import { ScreenContainer } from '@/components/screen-container';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { useColors } from '@/hooks/use-colors';
 import { CountryPickerModal } from '@/components/modals/country-picker';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 
 export default function SignUpScreen() {
+  const insets = useSafeAreaInsets();
   const router = useRouter();
   const colors = useColors();
   const { signUp, loading, error, setError } = useAuthStore();
@@ -74,266 +77,275 @@ export default function SignUpScreen() {
   const displayError = validationError || error;
 
   return (
-    <ScreenContainer containerClassName="bg-background" safeAreaClassName="bg-background">
-      <ScrollView
-        contentContainerStyle={{ flexGrow: 1 }}
-        showsVerticalScrollIndicator={false}
-        className="flex-1"
+    <ScreenContainer 
+    containerClassName="bg-background" 
+    safeAreaClassName="bg-background">
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 50 : 0}
+        style={{ flex: 1 }}
       >
-        <View className="flex-1 justify-center px-6 py-8">
-          {/* Header */}
-          <View className="mb-8 items-center">
-            <Text className="text-4xl font-bold text-foreground mb-2">Create Account</Text>
-            <Text className="text-base text-muted text-center">
-              Join Fambound and build your family's shared identity
-            </Text>
-          </View>
-
-          {/* Error Message */}
-          {displayError && (
-            <View className="mb-6 p-4 bg-error/10 rounded-lg border border-error/20">
-              <Text className="text-sm text-error font-medium">{displayError}</Text>
-            </View>
-          )}
-
-          {/* Email Input */}
-          <View className="mb-4">
-            <Text className="text-sm font-semibold text-foreground mb-2">Full Name</Text>
-            <TextInput
-              placeholder="John Doe"
-              placeholderTextColor={colors.muted}
-              value={fullName}
-              onChangeText={setFullName}
-              editable={!loading}
-              autoCapitalize="words"
-              className="bg-surface border border-border rounded-lg px-4 py-3 text-foreground text-base"
-              style={{ color: colors.foreground, borderColor: colors.border, backgroundColor: colors.surface }}
-            />
-          </View>
-          <View className="mb-4">
-            <Text className="text-sm font-semibold text-foreground mb-2">Email</Text>
-            <TextInput
-              placeholder="you@example.com"
-              placeholderTextColor={colors.muted}
-              value={email}
-              onChangeText={setEmail}
-              editable={!loading}
-              autoCapitalize="none"
-              keyboardType="email-address"
-              className="bg-surface border border-border rounded-lg px-4 py-3 text-foreground text-base"
-              style={{
-                color: colors.foreground,
-                borderColor: colors.border,
-                backgroundColor: colors.surface,
-              }}
-            />
-          </View>
-
-          <View className="mb-8">
-            <Text className="text-sm font-semibold text-foreground mb-3">Role</Text>
-            <View className="flex-row gap-2">
-              {["father", "mother"].map((role) => (
-                <Pressable
-                  key={role}
-                  onPress={() => setUserRole(role)}
-                  className={`flex-1 py-2 px-3 rounded-lg border capitalize ${
-                    userRole === role ? 'border-primary' : 'border-border'
-                  }`}
-                  style={{
-                    backgroundColor: userRole === role ? colors.primary : colors.surface,
-                  }}
-                >
-                  <Text
-                    className={`text-center font-semibold ${
-                      userRole === role ? 'text-white' : 'text-foreground'
-                    }`}
-                  >
-                    {role}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-          </View>
-
-          {/* Country Select */}
-          <View className="mb-4">
-            <Text className="text-sm font-semibold text-foreground mb-2">Country</Text>
-            <TouchableOpacity
-              onPress={() => setCountryModalVisible(true)}
-              disabled={loading}
-              className="bg-surface border border-border rounded-lg px-4 py-3"
-              style={{ borderColor: colors.border, backgroundColor: colors.surface }}
-            >
-              <Text className={country ? 'text-foreground text-base' : 'text-muted text-base'}>
-                {country || 'Select your country'}
+        <ScrollView
+          contentContainerStyle={{ flexGrow: 1 }}
+          showsVerticalScrollIndicator={false}
+          className="flex-1"
+        >
+          <View className="flex-1 justify-center px-6 py-8">
+            {/* Header */}
+            <View className="mb-8 items-center">
+              <Text className="text-4xl font-bold text-foreground mb-2">Create Account</Text>
+              <Text className="text-base text-muted text-center">
+                Join Fambound and build your family's shared identity
               </Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Ethnicity (optional) */}
-          <View className="mb-6">
-            <Text className="text-sm font-semibold text-foreground mb-2">
-              Ethnicity <Text className="text-muted font-normal">(optional)</Text>
-            </Text>
-            <TextInput
-              placeholder=""
-              placeholderTextColor={colors.muted}
-              value={ethnicity}
-              onChangeText={setEthnicity}
-              editable={!loading}
-              className="bg-surface border border-border rounded-lg px-4 py-3 text-foreground text-base"
-              style={{ color: colors.foreground, borderColor: colors.border, backgroundColor: colors.surface }}
-            />
-          </View>
-
-          {/* Password Input */}
-          <View className="mb-4">
-            <Text className="mb-2 text-sm font-semibold text-foreground">
-              Password
-            </Text>
-
-            <View
-              className="flex-row items-center rounded-lg border border-border bg-surface px-4"
-              style={{
-                borderColor: colors.border,
-                backgroundColor: colors.surface,
-              }}
-            >
-              <TextInput
-                placeholder="••••••••"
-                placeholderTextColor={colors.muted}
-                value={password}
-                onChangeText={setPassword}
-                editable={!loading}
-                secureTextEntry={!showPassword}
-                className="flex-1 py-4 text-base text-foreground"
-                style={{
-                  color: colors.foreground,
-                }}
-              />
-
-              <TouchableOpacity
-                onPress={() => setShowPassword((prev) => !prev)}
-                disabled={loading}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              >
-                <Ionicons
-                  name={showPassword ? "eye-off-outline" : "eye-outline"}
-                  size={22}
-                  color={colors.muted}
-                />
-              </TouchableOpacity>
             </View>
 
-            <Text className="mt-1 text-xs text-muted">
-              At least 8 characters
-            </Text>
-          </View>
+            {/* Error Message */}
+            {displayError && (
+              <View className="mb-6 p-4 bg-error/10 rounded-lg border border-error/20">
+                <Text className="text-sm text-error font-medium">{displayError}</Text>
+              </View>
+            )}
 
-          {/* Confirm Password Input */}
-          <View className="mb-6">
-            <Text className="mb-2 text-sm font-semibold text-foreground">
-              Confirm Password
-            </Text>
-
-            <View
-              className="flex-row items-center rounded-lg border border-border bg-surface px-4"
-              style={{
-                borderColor: colors.border,
-                backgroundColor: colors.surface,
-              }}
-            >
+            {/* Email Input */}
+            <View className="mb-4">
+              <Text className="text-sm font-semibold text-foreground mb-2">Full Name</Text>
               <TextInput
-                placeholder="••••••••"
+                placeholder="John Doe"
                 placeholderTextColor={colors.muted}
-                value={confirmPassword}
-                onChangeText={setConfirmPassword}
+                value={fullName}
+                onChangeText={setFullName}
                 editable={!loading}
-                secureTextEntry={!showConfirmPassword}
-                className="flex-1 py-4 text-base text-foreground"
+                autoCapitalize="words"
+                className="bg-surface border border-border rounded-lg px-4 py-3 text-foreground text-base"
+                style={{ color: colors.foreground, borderColor: colors.border, backgroundColor: colors.surface }}
+              />
+            </View>
+            <View className="mb-4">
+              <Text className="text-sm font-semibold text-foreground mb-2">Email</Text>
+              <TextInput
+                placeholder="you@example.com"
+                placeholderTextColor={colors.muted}
+                value={email}
+                onChangeText={setEmail}
+                editable={!loading}
+                autoCapitalize="none"
+                keyboardType="email-address"
+                className="bg-surface border border-border rounded-lg px-4 py-3 text-foreground text-base"
                 style={{
                   color: colors.foreground,
+                  borderColor: colors.border,
+                  backgroundColor: colors.surface,
                 }}
               />
-
-              <TouchableOpacity
-                onPress={() => setShowConfirmPassword((prev) => !prev)}
-                disabled={loading}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              >
-                <Ionicons
-                  name={showConfirmPassword ? "eye-off-outline" : "eye-outline"}
-                  size={22}
-                  color={colors.muted}
-                />
-              </TouchableOpacity>
             </View>
-          </View>
 
-          {/* Sign Up Button */}
-          <TouchableOpacity
-          onPress={handleSignUp}
-            disabled={loading}
-          className='py-4 items-center bg-primary rounded-lg mb-3'>
-              {loading ? (
-                <ActivityIndicator color={"#fff"} />
-              ) : (
-                <Text className='text-foreground text-base font-semibold'>
-                  Create Account
+            <View className="mb-8">
+              <Text className="text-sm font-semibold text-foreground mb-3">Role</Text>
+              <View className="flex-row gap-2">
+                {["father", "mother"].map((role) => (
+                  <Pressable
+                    key={role}
+                    onPress={() => setUserRole(role)}
+                    className={`flex-1 py-2 px-3 rounded-lg border capitalize ${
+                      userRole === role ? 'border-primary' : 'border-border'
+                    }`}
+                    style={{
+                      backgroundColor: userRole === role ? colors.primary : colors.surface,
+                    }}
+                  >
+                    <Text
+                      className={`text-center font-semibold ${
+                        userRole === role ? 'text-white' : 'text-foreground'
+                      }`}
+                    >
+                      {role}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+
+            {/* Country Select */}
+            <View className="mb-4">
+              <Text className="text-sm font-semibold text-foreground mb-2">Country</Text>
+              <TouchableOpacity
+                onPress={() => setCountryModalVisible(true)}
+                disabled={loading}
+                className="bg-surface border border-border rounded-lg px-4 py-3"
+                style={{ borderColor: colors.border, backgroundColor: colors.surface }}
+              >
+                <Text className={country ? 'text-foreground text-base' : 'text-muted text-base'}>
+                  {country || 'Select your country'}
                 </Text>
-              )}
-          </TouchableOpacity>
+              </TouchableOpacity>
+            </View>
 
-          {/* Divider */}
-          <View className="flex-row items-center mb-2">
-            <View className="flex-1 h-px bg-border" />
-            <Text className="mx-3 text-sm text-muted">Or</Text>
-            <View className="flex-1 h-px bg-border" />
-          </View>
+            {/* Ethnicity (optional) */}
+            <View className="mb-6">
+              <Text className="text-sm font-semibold text-foreground mb-2">
+                Ethnicity <Text className="text-muted font-normal">(optional)</Text>
+              </Text>
+              <TextInput
+                placeholder=""
+                placeholderTextColor={colors.muted}
+                value={ethnicity}
+                onChangeText={setEthnicity}
+                editable={!loading}
+                className="bg-surface border border-border rounded-lg px-4 py-3 text-foreground text-base"
+                style={{ color: colors.foreground, borderColor: colors.border, backgroundColor: colors.surface }}
+              />
+            </View>
 
-          <TouchableOpacity
-            onPress={() => router.push('/(auth)/join-family')}
-            className="py-3 items-center border border-primary rounded-lg mb-4"
-          >
-            <Text className="text-foreground text-base font-semibold">Join a Family</Text>
-          </TouchableOpacity>
+            {/* Password Input */}
+            <View className="mb-4">
+              <Text className="mb-2 text-sm font-semibold text-foreground">
+                Password
+              </Text>
 
-          {/* OAuth Buttons */}
-          {/* <View className="gap-3 mb-6">
-            <Pressable
+              <View
+                className="flex-row items-center rounded-lg border border-border bg-surface px-4"
+                style={{
+                  borderColor: colors.border,
+                  backgroundColor: colors.surface,
+                }}
+              >
+                <TextInput
+                  placeholder="••••••••"
+                  placeholderTextColor={colors.muted}
+                  value={password}
+                  onChangeText={setPassword}
+                  editable={!loading}
+                  secureTextEntry={!showPassword}
+                  className="flex-1 py-4 text-base text-foreground"
+                  style={{
+                    color: colors.foreground,
+                  }}
+                />
+
+                <TouchableOpacity
+                  onPress={() => setShowPassword((prev) => !prev)}
+                  disabled={loading}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <Ionicons
+                    name={showPassword ? "eye-off-outline" : "eye-outline"}
+                    size={22}
+                    color={colors.muted}
+                  />
+                </TouchableOpacity>
+              </View>
+
+              <Text className="mt-1 text-xs text-muted">
+                At least 8 characters
+              </Text>
+            </View>
+
+            {/* Confirm Password Input */}
+            <View className="mb-6">
+              <Text className="mb-2 text-sm font-semibold text-foreground">
+                Confirm Password
+              </Text>
+
+              <View
+                className="flex-row items-center rounded-lg border border-border bg-surface px-4"
+                style={{
+                  borderColor: colors.border,
+                  backgroundColor: colors.surface,
+                }}
+              >
+                <TextInput
+                  placeholder="••••••••"
+                  placeholderTextColor={colors.muted}
+                  value={confirmPassword}
+                  onChangeText={setConfirmPassword}
+                  editable={!loading}
+                  secureTextEntry={!showConfirmPassword}
+                  className="flex-1 py-4 text-base text-foreground"
+                  style={{
+                    color: colors.foreground,
+                  }}
+                />
+
+                <TouchableOpacity
+                  onPress={() => setShowConfirmPassword((prev) => !prev)}
+                  disabled={loading}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <Ionicons
+                    name={showConfirmPassword ? "eye-off-outline" : "eye-outline"}
+                    size={22}
+                    color={colors.muted}
+                  />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Sign Up Button */}
+            <TouchableOpacity
+            onPress={handleSignUp}
               disabled={loading}
-              style={({ pressed }) => [
-                { backgroundColor: colors.surface, borderColor: colors.border },
-                pressed && { opacity: 0.7 },
-              ]}
-              className="flex-row items-center justify-center border rounded-lg py-3"
+            className='py-4 items-center bg-primary rounded-lg mb-3'>
+                {loading ? (
+                  <ActivityIndicator color={"#fff"} />
+                ) : (
+                  <Text className='text-foreground text-base font-semibold'>
+                    Create Account
+                  </Text>
+                )}
+            </TouchableOpacity>
+
+            {/* Divider */}
+            <View className="flex-row items-center mb-2">
+              <View className="flex-1 h-px bg-border" />
+              <Text className="mx-3 text-sm text-muted">Or</Text>
+              <View className="flex-1 h-px bg-border" />
+            </View>
+
+            <Pressable
+              onPress={() => router.push('/(auth)/join-family')}
+              className="py-3 items-center border border-primary rounded-lg mb-4"
             >
-              <Text className="text-base font-semibold text-foreground">🍎 Sign up with Apple</Text>
+              <Text className="text-primary text-sm font-semibold">Join a Family</Text>
             </Pressable>
 
-            <Pressable
-              disabled={loading}
-              style={({ pressed }) => [
-                { backgroundColor: colors.surface, borderColor: colors.border },
-                pressed && { opacity: 0.7 },
-              ]}
-              className="flex-row items-center justify-center border rounded-lg py-3"
-            >
-              <Text className="text-base font-semibold text-foreground">🔵 Sign up with Google</Text>
-            </Pressable>
-          </View> */}
-
-          {/* Sign In Link */}
-          <View className="flex-row justify-center items-center">
-            <Text className="text-sm text-muted">Already have an account? </Text>
-            <Link href="/(auth)/sign-in" asChild>
-              <Pressable>
-                <Text className="text-sm font-semibold text-primary">Sign in</Text>
+            {/* OAuth Buttons */}
+            {/* <View className="gap-3 mb-6">
+              <Pressable
+                disabled={loading}
+                style={({ pressed }) => [
+                  { backgroundColor: colors.surface, borderColor: colors.border },
+                  pressed && { opacity: 0.7 },
+                ]}
+                className="flex-row items-center justify-center border rounded-lg py-3"
+              >
+                <Text className="text-base font-semibold text-foreground">🍎 Sign up with Apple</Text>
               </Pressable>
-            </Link>
+
+              <Pressable
+                disabled={loading}
+                style={({ pressed }) => [
+                  { backgroundColor: colors.surface, borderColor: colors.border },
+                  pressed && { opacity: 0.7 },
+                ]}
+                className="flex-row items-center justify-center border rounded-lg py-3"
+              >
+                <Text className="text-base font-semibold text-foreground">🔵 Sign up with Google</Text>
+              </Pressable>
+            </View> */}
+
+            {/* Sign In Link */}
+            <View className="flex-row justify-center items-center"
+            style={{ paddingBottom: Math.max(insets.bottom, 12) }}>
+              <Text className="text-sm text-muted">Already have an account? </Text>
+              <Link href="/(auth)/sign-in" asChild>
+                <Pressable>
+                  <Text className="text-sm font-semibold text-primary">Sign in</Text>
+                </Pressable>
+              </Link>
+            </View>
           </View>
-        </View>
-      </ScrollView>
+        </ScrollView>
+      </KeyboardAvoidingView>
       <CountryPickerModal
         visible={countryModalVisible}
         selected={country}

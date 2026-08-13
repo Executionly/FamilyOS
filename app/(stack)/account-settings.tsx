@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useColors } from '@/hooks/use-colors';
 import { ScreenContainer } from '@/components/screen-container';
 import { AppHeader } from '@/components/app-header';
+import { useFamilyStore } from '@/lib/stores/family-store';
 
 type MenuItem = {
   icon: keyof typeof Ionicons.glyphMap;
@@ -13,15 +14,16 @@ type MenuItem = {
   open: boolean;
 };
 
-const MENU_ITEMS: MenuItem[] = [
-  { icon: 'people-outline', label: 'Profile', route: '/(stack)/update-profile', adminOnly: false, open: true },
-  { icon: 'notifications-outline', label: 'Notification Preferences', route: '/(stack)/notification-preference', open: true  },
-  { icon: 'lock-closed-outline', label: 'Change Password', route: '/(stack)/change-password',open: true  },
-];
 
 export default function ProfileScreen() {
   const router = useRouter();
   const colors = useColors();
+  const { currentMember } = useFamilyStore();
+  const MENU_ITEMS: MenuItem[] = [
+    { icon: 'people-outline', label: 'Profile', route: `/(stack)/update-profile`, adminOnly: false, open: true },
+    { icon: 'notifications-outline', label: 'Notification Preferences', route: '/(stack)/notification-preference', open: true  },
+    { icon: 'lock-closed-outline', label: 'Change Password', route: '/(stack)/change-password',open: true  },
+  ];
 
   return (
     <ScreenContainer containerClassName="bg-background" safeAreaClassName="bg-background">

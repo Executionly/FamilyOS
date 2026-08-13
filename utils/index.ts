@@ -1,5 +1,6 @@
 import { useColors } from "@/hooks/use-colors";
 
+export const memberLimit = 4;
 
 export type MemberRole = 'admin'  | 'mother' | 'father' | 'member' | 'child' | string;
 export type AgeBand = 'toddler' | 'child' | 'preteen' | 'teen' | 'adult' | string;

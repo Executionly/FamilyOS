@@ -21,37 +21,35 @@ serve(async (req) => {
 
     const now = new Date();
     const target = new Date(now);
-    if (mode === 'advance') target.setDate(now.getDate() + 1); // tomorrow
+    if (mode === 'advance') target.setDate(now.getDate() + 1);
+    const targetDateStr = target.toISOString().split('T')[0];
 
-    const targetMonth = target.getMonth() + 1;
-    const targetDay = target.getDate();
+    // The DB does the matching now — this only ever returns events that ACTUALLY occur on target_date,
+    // not every recurring event across every family
+    const { data: matchingEvents, error } = await supabase.rpc('get_events_occurring_on', {
+      target_date: targetDateStr,
+    });
+    if (error) throw error;
 
-    const { data: specialDays } = await supabase
-      .from('special_day')
-      .select('*, family:family_id(name)')
-      .eq('month', targetMonth)
-      .eq('day', targetDay);
+    let processed = 0;
 
-    for (const sd of specialDays ?? []) {
+    for (const evt of matchingEvents ?? []) {
       const { data: members } = await supabase
         .from('member')
         .select('id, name, user_id, date_of_birth')
-        .eq('family_id', sd.family_id);
+        .eq('family_id', evt.family_id);
 
       const allFamilyUserIds = (members ?? []).map((m) => m.user_id).filter(Boolean) as string[];
+      if (allFamilyUserIds.length === 0) continue;
 
       if (mode === 'advance') {
-        await sendPushToMany(
-          sd.family_id, allFamilyUserIds,
-          'Coming up tomorrow',
-          `${sd.title} is tomorrow!`
-        );
+        await sendPushToMany(evt.family_id, allFamilyUserIds, 'Coming up tomorrow', `${evt.title} is tomorrow!`);
+        processed++;
         continue;
       }
 
-      // mode === 'same_day'
-      if (sd.type === 'birthday') {
-        const celebrant = (members ?? []).find((m) => sd.related_member_ids?.includes(m.id));
+      if (evt.category === 'birthday') {
+        const celebrant = (members ?? []).find((m) => evt.related_member_ids?.includes(m.id));
         let ageLine = '';
         if (celebrant?.date_of_birth) {
           const dob = new Date(celebrant.date_of_birth);
@@ -59,20 +57,17 @@ serve(async (req) => {
           ageLine = ` They're turning ${age}!`;
         }
         await sendPushToMany(
-          sd.family_id, allFamilyUserIds,
+          evt.family_id, allFamilyUserIds,
           `🎉 Happy Birthday ${celebrant?.name ?? ''}!`,
           `Today is ${celebrant?.name ?? 'their'}'s birthday.${ageLine} Send your wishes!`
         );
       } else {
-        await sendPushToMany(
-          sd.family_id, allFamilyUserIds,
-          `🎊 ${sd.title}`,
-          `Today is ${sd.title}!`
-        );
+        await sendPushToMany(evt.family_id, allFamilyUserIds, `🎊 ${evt.title}`, `Today is ${evt.title}!`);
       }
+      processed++;
     }
 
-    return new Response(JSON.stringify({ processed: specialDays?.length ?? 0 }), { status: 200 });
+    return new Response(JSON.stringify({ processed, matched_events: matchingEvents?.length ?? 0 }), { status: 200 });
   } catch (err) {
     console.error('check-special-days error:', err);
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });

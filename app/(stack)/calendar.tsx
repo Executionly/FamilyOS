@@ -1,6 +1,6 @@
 import { ScrollView, Text, View, Pressable, ActivityIndicator, FlatList } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { ScreenContainer } from '@/components/screen-container';
 import { useColors } from '@/hooks/use-colors';
 import { useFamilyStore } from '@/lib/stores/family-store';
@@ -8,8 +8,12 @@ import { useCalendarStore } from '@/lib/stores/calendar-store';
 import { AppHeader } from '@/components/app-header';
 import { CATEGORIES } from '@/constants/event-categories';
 import { Ionicons } from '@expo/vector-icons';
+import { expandAllOccurrences } from '@/utils/event-occurences';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 
 export default function CalendarScreen() {
+    const insets = useSafeAreaInsets();
   const router = useRouter();
   const colors = useColors();
   const { family } = useFamilyStore();
@@ -32,11 +36,6 @@ export default function CalendarScreen() {
     return new Date(date.getFullYear(), date.getMonth(), 1).getDay();
   };
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  };
-
   const formatTime = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
@@ -50,11 +49,20 @@ export default function CalendarScreen() {
     );
   };
 
+  // Expand recurring events (weekly/monthly/annually — including auto-generated birthdays)
+  // into concrete occurrences for the visible month, with a little padding on each side
+  // so the grid's first/last week (which can spill into adjacent months) still renders correctly.
+  const monthOccurrences = useMemo(() => {
+    const rangeStart = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
+    rangeStart.setDate(rangeStart.getDate() - 7);
+    const rangeEnd = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0);
+    rangeEnd.setDate(rangeEnd.getDate() + 7);
+
+    return expandAllOccurrences(events, rangeStart, rangeEnd);
+  }, [events, currentMonth]);
+
   const getEventsForDay = (date: Date) => {
-    return events.filter((event) => {
-      const eventDate = new Date(event.start_date);
-      return isSameDay(eventDate, date);
-    });
+    return monthOccurrences.filter((occ) => isSameDay(new Date(occ.occurrence_date), date));
   };
 
   const getDaysArray = () => {
@@ -125,7 +133,6 @@ export default function CalendarScreen() {
 
           {/* Calendar Grid */}
           <View className="mb-3 p-4 rounded-lg border border-border" style={{ backgroundColor: colors.surface }}>
-            {/* Day Headers */}
             <View className="flex-row mb-2">
               {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
                 <View key={day} className="flex-1 items-center py-2">
@@ -134,42 +141,44 @@ export default function CalendarScreen() {
               ))}
             </View>
 
-            {/* Calendar Days */}
             <View>
               {Array.from({ length: Math.ceil(days.length / 7) }).map((_, weekIndex) => (
                 <View key={weekIndex} className="flex-row">
-                  {days.slice(weekIndex * 7, (weekIndex + 1) * 7).map((day, dayIndex) => (
-                    <Pressable
-                      key={`${weekIndex}-${dayIndex}`}
-                      onPress={() => day && setSelectedDate(day)}
-                      className={`flex-1 aspect-square items-center justify-center rounded border ${
-                        day && isSameDay(day, selectedDate) ? 'border-primary bg-primary' : 'border-border'
-                      }`}
-                      style={{
-                        backgroundColor:
-                          day && isSameDay(day, selectedDate)
-                            ? colors.primary
-                            : day && getEventsForDay(day).length > 0
-                            ? colors.surface
-                            : 'transparent',
-                      }}
-                    >
-                      {day && (
-                        <>
-                          <Text
-                            className={`text-sm font-semibold ${
-                              isSameDay(day, selectedDate) ? 'text-white' : 'text-foreground'
-                            }`}
-                          >
-                            {day.getDate()}
-                          </Text>
-                          {getEventsForDay(day).length > 0 && (
-                            <View className="w-1 h-1 rounded-full bg-primary mt-1" />
-                          )}
-                        </>
-                      )}
-                    </Pressable>
-                  ))}
+                  {days.slice(weekIndex * 7, (weekIndex + 1) * 7).map((day, dayIndex) => {
+                    const dayEvents = day ? getEventsForDay(day) : [];
+                    return (
+                      <Pressable
+                        key={`${weekIndex}-${dayIndex}`}
+                        onPress={() => day && setSelectedDate(day)}
+                        className={`flex-1 aspect-square items-center justify-center rounded border ${
+                          day && isSameDay(day, selectedDate) ? 'border-primary bg-primary' : 'border-border'
+                        }`}
+                        style={{
+                          backgroundColor:
+                            day && isSameDay(day, selectedDate)
+                              ? colors.primary
+                              : day && dayEvents.length > 0
+                              ? colors.surface
+                              : 'transparent',
+                        }}
+                      >
+                        {day && (
+                          <>
+                            <Text
+                              className={`text-sm font-semibold ${
+                                isSameDay(day, selectedDate) ? 'text-white' : 'text-foreground'
+                              }`}
+                            >
+                              {day.getDate()}
+                            </Text>
+                            {dayEvents.length > 0 && (
+                              <View className="w-1 h-1 rounded-full bg-primary mt-1" />
+                            )}
+                          </>
+                        )}
+                      </Pressable>
+                    );
+                  })}
                 </View>
               ))}
             </View>
@@ -189,9 +198,10 @@ export default function CalendarScreen() {
               <FlatList
                 scrollEnabled={false}
                 data={selectedDayEvents}
-                keyExtractor={(item) => item.id}
+                keyExtractor={(item) => `${item.id}-${item.occurrence_date}`}
                 renderItem={({ item }) => {
                   const catInfo = CATEGORIES.find((c) => c.key === item.category) ?? CATEGORIES[0];
+                  const isFullDay = ['birthday', 'anniversary'].includes(item.category);
                   return (
                     <View className="mb-3 rounded-2xl border border-border p-4" style={{ backgroundColor: colors.surface }}>
                       <View className="flex-row items-start gap-3">
@@ -207,11 +217,16 @@ export default function CalendarScreen() {
                               <Text className="text-[10px] font-semibold text-primary">{catInfo.label}</Text>
                             </View>
                           </View>
-                          <Text className="mt-1 text-sm text-muted">
-                            {formatTime(item.start_date)} - {formatTime(item.end_date)}
-                          </Text>
+                          {!isFullDay && (
+                            <Text className="mt-1 text-sm text-muted">
+                              {formatTime(item.occurrence_date)} - {formatTime(new Date(new Date(item.occurrence_date).getTime() + (new Date(item.end_date).getTime() - new Date(item.start_date).getTime())).toISOString())}
+                            </Text>
+                          )}
                           {item.location && (
                             <Text className="mt-1 text-sm text-muted">📍 {item.location}</Text>
+                          )}
+                          {item.is_virtual && (
+                            <Text className="mt-1 text-[11px] italic text-muted">Repeats {item.recurrence}</Text>
                           )}
                         </View>
                       </View>
@@ -224,8 +239,8 @@ export default function CalendarScreen() {
         </View>
       </ScrollView>
 
-      {/* Add Event Button */}
-      <View className="px-6 mb-10">
+      <View className="px-6"
+      style={{ paddingBottom: Math.max(insets.bottom, 12) }}>
         <Pressable
           onPress={handleAddEvent}
           className="py-4 rounded-lg items-center"

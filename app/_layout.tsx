@@ -12,7 +12,7 @@ import { Inter_400Regular, Inter_500Medium, Inter_600SemiBold } from '@expo-goog
 import { ToastHost } from '@/components/ToastHost';
 import { BriefingModal } from '@/components/briefing-modal';
 import { StatusBar } from 'expo-status-bar';
-
+import {SafeAreaProvider} from 'react-native-safe-area-context'
 
 SplashScreen.preventAutoHideAsync();
 
@@ -35,24 +35,26 @@ export default function RootLayout() {
     return null;
   }
   return (
-      <GestureHandlerRootView style={{ flex: 1 }}>
-        <ThemeProvider>
-          <StatusBar style='dark'/>
-          <ToastHost />
-          <BriefingModal />
-          <Stack
-            screenOptions={{
-              headerShown: false,
-            }}
-          >
-            <Stack.Screen name="index" />
-            <Stack.Screen name="get-started" />
-            <Stack.Screen name="(auth)" />
-            <Stack.Screen name="(tabs)" />
-            <Stack.Screen name="(onboarding)" />
-            <Stack.Screen name="(stack)" />
-          </Stack>
-        </ThemeProvider>
-      </GestureHandlerRootView>
+      <SafeAreaProvider>
+          <GestureHandlerRootView style={{ flex: 1 }}>
+            <ThemeProvider>
+              <StatusBar style='dark'/>
+              <ToastHost />
+              <BriefingModal />
+                <Stack
+                  screenOptions={{
+                    headerShown: false,
+                  }}
+                >
+                  <Stack.Screen name="index" />
+                  <Stack.Screen name="get-started" />
+                  <Stack.Screen name="(auth)" />
+                  <Stack.Screen name="(tabs)" />
+                  <Stack.Screen name="(onboarding)" />
+                  <Stack.Screen name="(stack)" />
+                </Stack>
+            </ThemeProvider>
+          </GestureHandlerRootView>
+      </SafeAreaProvider>
   );
 }

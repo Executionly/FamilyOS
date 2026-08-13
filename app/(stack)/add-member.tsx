@@ -2,20 +2,22 @@ import { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView, ActivityIndicator, Modal, KeyboardAvoidingView, Platform, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useColors } from '@/hooks/use-colors';
-import { useFamilyStore } from '@/lib/stores/family-store';
+import { MemberLimitError, useFamilyStore } from '@/lib/stores/family-store';
 import { ScreenContainer } from '@/components/screen-container';
 import { AppHeader } from '@/components/app-header';
-import { AgeBand, PRESET_AGE_BANDS, PRESET_ROLES } from '@/utils';
+import { AgeBand, memberLimit, PRESET_AGE_BANDS, PRESET_ROLES } from '@/utils';
 import { ChipSelector, ROLE_COLORS,CustomInputModal } from '../(onboarding)/add-members';
-
-
-
+import { useSubscriptionStore } from '@/lib/stores/subscription-store';
+import { UpgradePrompt } from '@/components/upgrade-prompt';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 
 export default function AddMemberScreen() {
+  const insets = useSafeAreaInsets()
   const router = useRouter();
   const colors = useColors();
-  const { family, addMember, loading,error } = useFamilyStore();
+  const { family, members, addMember, loading,error } = useFamilyStore();
+  const { tier } = useSubscriptionStore();
 
   const [name, setName] = useState('');
   const [role, setRole] = useState<(typeof PRESET_ROLES)[number]>('member');
@@ -27,6 +29,10 @@ export default function AddMemberScreen() {
  const showAgeBand = ['child', 'member', ...customRoles].includes(role) ||
     !PRESET_ROLES.includes(role);
 
+  const [upgradePromptVisible, setUpgradePromptVisible] = useState(false);
+
+  const atLimit = tier === 'free' && (members?.length ?? 0) >= memberLimit;
+
   const handleSubmit = async () => {
     setValidationError(null);
     if (!name.trim()) {
@@ -35,10 +41,19 @@ export default function AddMemberScreen() {
     }
     if (!family?.id) return;
 
+    if (atLimit) {
+      setUpgradePromptVisible(true);
+      return;
+    }
+
     try {
       await addMember(family.id, { name: name.trim(), role, age_band: ageBand });
       router.back();
-    } catch {
+    } catch(err) {
+      if (err instanceof MemberLimitError) {
+        setUpgradePromptVisible(true);
+        return;
+      }
       // error already set in store
     }
   };
@@ -62,6 +77,13 @@ export default function AddMemberScreen() {
         onClose={() => setShowAgeBandModal(false)}
       />
       <ScrollView contentContainerStyle={{ flexGrow: 1 }} className="flex-1 px-6 pt-6">
+        {tier === 'free' && (
+          <View className="mb-4 rounded-xl border border-border bg-surface p-3">
+            <Text className="text-xs text-muted">
+              {members?.length ?? 0} of {memberLimit} members used on the free plan
+            </Text>
+          </View>
+        )}
         {displayError && (
           <View className="mb-4 p-4 bg-error/10 rounded-lg border border-error/20">
             <Text className="text-sm text-error font-medium">{displayError}</Text>
@@ -121,20 +143,25 @@ export default function AddMemberScreen() {
         </View>
 
       </ScrollView>
-      <View className='px-4 py-4'>
-            <TouchableOpacity
-                onPress={handleSubmit}
-                disabled={loading}
-                className="py-4 items-center bg-primary rounded-lg mb-8"
-            >
-                {loading ? (
-                <ActivityIndicator color="#fff" />
-                ) : (
-                <Text className="text-white text-base font-semibold">Add Member</Text>
-                )}
-            </TouchableOpacity>
-
+      <View className='px-4 py-4'
+      style={{ paddingBottom: Math.max(insets.bottom, 12) }}>
+        <TouchableOpacity
+            onPress={handleSubmit}
+            disabled={loading}
+            className="py-4 items-center bg-primary rounded-lg mb-8"
+        >
+            {loading ? (
+            <ActivityIndicator color="#fff" />
+            ) : (
+            <Text className="text-white text-base font-semibold">Add Member</Text>
+            )}
+        </TouchableOpacity>
       </View>
+      <UpgradePrompt
+      visible={upgradePromptVisible}
+      onClose={() => setUpgradePromptVisible(false)}
+      reason="member_limit"
+      />
     </ScreenContainer>
   );
 }

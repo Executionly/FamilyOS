@@ -4,6 +4,12 @@ import { embedContent } from '../services/embed-content';
 import { notifyMember } from '../services/notify';
 import { checkStorageBeforeUpload, getFileSizeBytes, recordUpload, StorageLimitError } from '@/utils/storage-gate';
 
+export class MemberLimitError extends Error {
+  constructor() {
+    super('member_limit_exceeded');
+  }
+}
+
 export type MemberRole = 'admin' | 'coparent' | 'member' | 'child' | string;
 export type AgeBand = 'toddler' | 'child' | 'preteen' | 'teen' | 'adult' | string;
 
@@ -30,7 +36,7 @@ export interface Family {
   name: string;
   photo_url?: string;
   created_by: string;
-  subscription_status: 'free' | 'premium';
+  subscription_status: 'active' | 'inactive' | 'cancelled' | 'expired' | 'billing_issue' | 'paused' | 'refunded' | null;
   subscription_tier: 'free' | 'premium';
   created_at: string;
   updated_at: string;
@@ -250,7 +256,12 @@ export const useFamilyStore = create<FamilyState>((set, get) => ({
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        if (error.message?.includes('member_limit_exceeded')) {
+          throw new MemberLimitError();
+        }
+        throw error;
+      }
 
       set((state) => ({
         members: [...state.members, data],
@@ -263,6 +274,10 @@ export const useFamilyStore = create<FamilyState>((set, get) => ({
         content: `Family member: ${data.name}, role: ${data.role}${data.age_band ? `, age group: ${data.age_band}` : ''}.`,
       });
     } catch (error) {
+      if (error instanceof MemberLimitError) {
+        set({ loading: false });
+        throw error;
+      }
       const message = error instanceof Error ? error.message : 'Failed to add member';
       set({ error: message });
       throw error;

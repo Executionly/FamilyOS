@@ -4,8 +4,8 @@ import { notifyFamily } from '../services/notify';
 import { embedContent } from '../services/embed-content';
 import { useAuthStore } from './auth-store';
 import { useToastStore } from './toast-store';
+import { EventCategory } from '@/constants/event-categories';
 
-export type EventCategory = 'school' | 'medical' | 'travel' | 'financial' | 'activity' | 'household' | 'routine' | 'general';
 
 export interface CalendarEvent {
   id: string;
@@ -16,8 +16,9 @@ export interface CalendarEvent {
   end_date: string;
   location?: string;
   color?: string;
-  recurrence?: 'none' | 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'bimonthly' | 'quaterly' | 'annually';
+  recurrence: 'none' | 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'bimonthly' | 'quaterly' | 'annually';
   category: EventCategory;
+  related_member_ids?: string[];
   created_at: string;
   updated_at: string;
 }

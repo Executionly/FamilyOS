@@ -2,11 +2,13 @@ import { View, Text, Modal, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useColors } from '@/hooks/use-colors';
+import { memberLimit } from '@/utils';
+import { useFamilyStore } from '@/lib/stores/family-store';
 
 interface UpgradePromptProps {
   visible: boolean;
   onClose: () => void;
-  reason: 'ai_feature' | 'storage_limit' | 'quota_exceeded' | 'video_limit';
+  reason: 'ai_feature' | 'storage_limit' | 'quota_exceeded' | 'video_limit' | 'member_limit';
   usedBytes?: number;
   limitBytes?: number;
   videoLimit?: number;
@@ -30,11 +32,16 @@ const COPY: Record<UpgradePromptProps['reason'], { title: string; body: string }
     title: "You've reached your free video limit",
     body: 'Free accounts can save up to 3 videos. Upgrade to Premium for unlimited video memories.',
   },
+  member_limit: {
+    title: "You've reached your member limit",
+    body: 'Free accounts can have up to 4 family members. Upgrade to Premium to add more.',
+  },
 };
 
 export function UpgradePrompt({ visible, onClose, reason, usedBytes, limitBytes,videosUsed,videoLimit }: UpgradePromptProps) {
   const router = useRouter();
   const colors = useColors();
+  const { members } = useFamilyStore();
   const copy = COPY[reason];
 
   return (
@@ -46,6 +53,12 @@ export function UpgradePrompt({ visible, onClose, reason, usedBytes, limitBytes,
           </View>
           <Text className="text-lg font-bold text-foreground">{copy.title}</Text>
           <Text className="mt-2 text-sm leading-5 text-muted">{copy.body}</Text>
+
+          {reason === "member_limit" && (
+            <Text className="text-xs text-muted">
+              {members?.length ?? 0} of {memberLimit} members used on the free plan
+            </Text>
+          )}
 
           {reason === 'storage_limit' && limitBytes && (
             <Text className="mt-2 text-xs text-muted">

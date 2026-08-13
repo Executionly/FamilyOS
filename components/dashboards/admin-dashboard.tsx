@@ -290,13 +290,16 @@ export default function AdminDashboard() {
         }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <View style={{ flex: 1 }}>
-              <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13, fontWeight: '500' }}>
-                {now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
-              </Text>
+              <View className="flex-row items-center">
+                <Text className='mr-2'
+                style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13, fontWeight: '500' }}>
+                  {now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+                </Text>
+                <TierBadge tier={family?.subscription_tier} />
+              </View>
               <Text style={{ color: '#fff', fontSize: 26, fontWeight: '800', marginTop: 4, lineHeight: 32 }}>
                 {greeting()},{'\n'}{family?.name} Family 👋
               </Text>
-              <TierBadge tier={family?.subscription_tier} />
             </View>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
               <NotificationBell />
@@ -384,7 +387,7 @@ export default function AdminDashboard() {
               </View>
             </View>
           </View>
-{/* ── Premium upsell (only shown on free plan) ──────── */}
+          {/* ── Premium upsell (only shown on free plan) ──────── */}
           {!isPremium && (
             <Pressable
               onPress={() => router.push('/(stack)/paywall')}

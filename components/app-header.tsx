@@ -1,5 +1,6 @@
 import { View, Text, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 
 interface AppHeaderProps {
   title: string;
@@ -14,8 +15,11 @@ export function AppHeader({ title, subtitle, showBack = false, onBack, right }: 
 
   return (
     <View className="flex-row items-center justify-between mb-6 px-6 pb-3 border-b border-b-gray-200">
-      {showBack && <Pressable onPress={() => router.back()}>
-        <Text className="text-primary text-lg font-semibold">← Back</Text>
+      {showBack && 
+      <Pressable onPress={() => router.back()}
+      className="flex-row items-center">
+        <Ionicons name="chevron-back" size={20} color="#0a7ea4" />
+        <Text className="text-primary text-lg font-semibold"> Back</Text>
       </Pressable>}
 
       {title && <View 

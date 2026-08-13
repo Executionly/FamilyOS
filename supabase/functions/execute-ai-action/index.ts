@@ -27,10 +27,19 @@ serve(async (req) => {
     }
 
     if (action.action_type === 'create_event') {
+       const startDate = new Date(args.start_date);
+        const endDate = args.end_date
+          ? args.end_date
+          : new Date(startDate.getTime() + 86400000).toISOString(); // default: full day, matches the manual-create screen's logic
+
+        const relatedMemberIds = await Promise.all(
+          (args.related_member_names ?? []).map((name: string) => resolveMemberId(name))
+        );
       await supabase.from('calendar_event').insert([{
         family_id: action.family_id, created_by: resolved_by_user_id,
-        title: args.title, start_date: args.start_date, end_date: args.end_date,
+        title: args.title, start_date: args.start_date, end_date: endDate,
         location: args.location ?? null, category: args.category ?? 'general',
+        related_member_ids: relatedMemberIds.filter(Boolean),
       }]);
     } else if (action.action_type === 'reschedule_event') {
       const { data: existing } = await supabase

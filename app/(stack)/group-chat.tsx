@@ -11,9 +11,11 @@ import ImageView from "react-native-image-viewing";
 import { useDmStore } from '@/lib/stores/dm-store';
 import { StorageLimitError } from '@/utils/storage-gate';
 import { UpgradePrompt } from '@/components/upgrade-prompt';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 
 export default function GroupChatScreen() {
+    const insets = useSafeAreaInsets();
     const router = useRouter();
     const colors = useColors();
     const { user } = useAuthStore();
@@ -91,9 +93,9 @@ export default function GroupChatScreen() {
       </View>
 
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
-        className="flex-1"
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 50 : 0}
+        style={{ flex: 1 }}
       >
         {loading ? (
           <View className="flex-1 items-center justify-center">
@@ -170,7 +172,8 @@ export default function GroupChatScreen() {
           </View>
         )}
 
-        <View className="flex-row items-center border-t border-border bg-background px-6 py-3 mb-6">
+        <View className="flex-row items-center border-t border-border bg-background px-6 py-3"
+        style={{ paddingBottom: Math.max(insets.bottom, 12) }}>
           <Pressable onPress={handleImagePick} className="mr-2" hitSlop={8}>
             <Ionicons name="image-outline" size={24} color={colors.primary} />
           </Pressable>

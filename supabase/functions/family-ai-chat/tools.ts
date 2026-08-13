@@ -34,7 +34,7 @@ export const TOOLS = [
     type: 'function',
     function: {
       name: 'create_event',
-      description: 'Propose a new calendar event. Requires family approval.',
+      description: 'Propose a new calendar event, including birthdays, anniversaries, or celebrations. Requires family approval.',
       parameters: {
         type: 'object',
         properties: {
@@ -42,7 +42,20 @@ export const TOOLS = [
           start_date: { type: 'string', description: 'ISO 8601 datetime' },
           end_date: { type: 'string', description: 'ISO 8601 datetime' },
           location: { type: 'string' },
-          category: { type: 'string', enum: ['school', 'medical', 'travel', 'financial', 'activity', 'household', 'routine', 'general'] },
+          category: {
+            type: 'string',
+            enum: ['school', 'medical', 'travel', 'financial', 'activity', 'household', 'routine', 'general', 'birthday', 'anniversary', 'celebration'],
+          },
+          recurrence: {
+            type: 'string',
+            enum: ['none', 'daily', 'weekly', 'biweekly', 'monthly', 'bimonthly', 'quaterly', 'annually'],
+            description: 'Use "annually" for birthdays and anniversaries',
+          },
+          related_member_names: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Names of family members this event is about, for birthdays/anniversaries',
+          },
         },
         required: ['title', 'start_date', 'end_date'],
       },

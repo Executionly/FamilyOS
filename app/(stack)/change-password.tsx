@@ -13,11 +13,11 @@ import { useAuthStore } from "@/lib/stores/auth-store";
 import { ScreenContainer } from "@/components/screen-container";
 import { AppHeader } from "@/components/app-header";
 import { Ionicons } from "@expo/vector-icons";
-
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function ChangePasswordScreen() {
   const colors = useColors();
-
+    const insets = useSafeAreaInsets();
   const { loading, error, setError, changePassword } = useAuthStore();
 
   const [currentPassword, setCurrentPassword] = useState("");
@@ -204,7 +204,8 @@ export default function ChangePasswordScreen() {
             </View>
 
         </ScrollView>
-        <View className="px-6 mb-12">
+        <View className="px-6"
+         style={{ paddingBottom: Math.max(insets.bottom, 12) }}>
             <TouchableOpacity
             onPress={handleSubmit}
             disabled={loading}

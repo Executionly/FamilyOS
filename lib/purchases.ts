@@ -1,15 +1,16 @@
 import Purchases from 'react-native-purchases';
 import { Platform } from 'react-native';
 
-const REVENUECAT_API_KEY_IOS = 'appl_xxx'; // from RevenueCat dashboard
-const REVENUECAT_API_KEY_ANDROID = 'test_zmFewLIPklsszQyeZztNFrtlgrr';
+const REVENUECAT_API_KEY_IOS = 'appl_xxx';
+const REVENUECAT_API_KEY_ANDROID = process.env.EXPO_PUBLIC_REVENUECAT_API_KEY_ANDROID;
 let purchasesInitialized = false;
-
 export function initPurchases(familyId: string) {
   if (purchasesInitialized) return;
+  if(Platform.OS === 'ios') return
   purchasesInitialized = true;
   Purchases.configure({
-    apiKey: Platform.OS === 'ios' ? REVENUECAT_API_KEY_IOS : REVENUECAT_API_KEY_ANDROID,
+    // apiKey: Platform.OS === 'ios' ? REVENUECAT_API_KEY_IOS : REVENUECAT_API_KEY_ANDROID,
+    apiKey: REVENUECAT_API_KEY_ANDROID,
     appUserID: familyId, // this is what makes app_user_id in the webhook match your family_id
   });
 }

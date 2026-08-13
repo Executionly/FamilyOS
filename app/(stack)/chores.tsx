@@ -9,6 +9,8 @@ import { useFamilyStore } from '@/lib/stores/family-store';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { ChoreStatus, useChoreStore } from '@/lib/stores/chore-store';
 import { isAdminAccess } from '@/utils';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 
 type FilterKey = 'all' | 'pending' | 'in_progress' | 'completed' | 'cancelled';
 
@@ -21,6 +23,7 @@ const FILTERS: { key: FilterKey; label: string }[] = [
 ];
 
 export default function ChoresScreen() {
+  const insets = useSafeAreaInsets();
   const router = useRouter();
   const colors = useColors();
   const { family, members, currentMember } = useFamilyStore();
@@ -195,7 +198,8 @@ export default function ChoresScreen() {
         />
       )}
       {isEditor && (
-        <View className="px-4 pt-3 mb-10">
+        <View className="px-4 pt-3"
+         style={{ paddingBottom: Math.max(insets.bottom, 12) }}>
           <Pressable
             onPress={() => router.push('/(stack)/create-chore')}
             className="flex-row items-center justify-center rounded-xl bg-primary py-3"

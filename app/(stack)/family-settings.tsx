@@ -10,8 +10,11 @@ import { isAdminAccess } from '@/utils';
 import { StorageLimitError } from '@/utils/storage-gate';
 import { UpgradePrompt } from '@/components/upgrade-prompt';
 import { useAuthStore } from '@/lib/stores/auth-store';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 
 export default function FamilySettingsScreen() {
+    const insets = useSafeAreaInsets();
     const colors = useColors();
     const {user} = useAuthStore()
     const { family, uploadFamilyPhoto, getFamilyPhotoSignedUrl, updateFamilyName, loading, error, currentMember} = useFamilyStore();
@@ -131,7 +134,8 @@ export default function FamilySettingsScreen() {
         />
         
       </ScrollView>
-      <View className='px-6 mb-10'>
+      <View className='px-6'
+       style={{ paddingBottom: Math.max(insets.bottom, 12) }}>
         <Pressable
           onPress={handleSaveName}
           disabled={loading}

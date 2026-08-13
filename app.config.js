@@ -37,6 +37,7 @@ module.exports = {
     predictiveBackGestureEnabled: false,
     package: env.androidPackage,
     permissions: ["POST_NOTIFICATIONS"],
+    softwareKeyboardLayoutMode: "resize",
     intentFilters: [
       {
         action: "VIEW",

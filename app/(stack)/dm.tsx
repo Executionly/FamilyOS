@@ -10,8 +10,11 @@ import { ScreenContainer } from '@/components/screen-container';
 import { AppHeader } from '@/components/app-header';
 import { UpgradePrompt } from '@/components/upgrade-prompt';
 import { StorageLimitError } from '@/utils/storage-gate';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 
 export default function DmThreadScreen() {
+  const insets = useSafeAreaInsets();
   const router = useRouter();
   const colors = useColors();
   const { userId: otherUserId } = useLocalSearchParams<{ userId: string }>();
@@ -62,95 +65,97 @@ export default function DmThreadScreen() {
   };
 
   return (
-    <ScreenContainer containerClassName="bg-background" safeAreaClassName="bg-background">
+      <ScreenContainer containerClassName="bg-background" 
+      safeAreaClassName="bg-background">
         <AppHeader title={otherMember?.name ?? 'Family member'} showBack/>
-
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 40 : 0}
-        className="flex-1"
-      >
-        {loading ? (
-          <View className="flex-1 items-center justify-center">
-            <ActivityIndicator color={colors.primary} />
-          </View>
-        ) : (
-          <FlatList
-            ref={listRef}
-            data={messages}
-            keyExtractor={(item) => item.id}
-            contentContainerStyle={{ padding: 16, flexGrow: 1 }}
-            ListEmptyComponent={
-              <View className="flex-1 items-center justify-center px-8">
-                <Text className="text-center text-base text-muted">Say hello to {otherMember?.name ?? 'them'}!</Text>
+        
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : "height"}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 50 : 0}
+          style={{ flex: 1 }}
+        >
+            {loading ? (
+              <View className="flex-1 items-center justify-center">
+                <ActivityIndicator color={colors.primary} />
               </View>
-            }
-            renderItem={({ item }) => {
-              const isMine = item.sender_id === user?.id;
-              return (
-                <View className={`mb-3 max-w-[80%] ${isMine ? 'self-end items-end' : 'self-start items-start'}`}>
-                  <View
-                    className={`rounded-2xl px-4 py-3 ${
-                      isMine ? 'rounded-br-sm bg-primary' : 'rounded-bl-sm border border-border bg-surface'
-                    }`}
-                  >
-                    {item.image_path ? (
-                      item.signed_image_url ? (
-                        <Image source={{ uri: item.signed_image_url }} className="h-48 w-48 rounded-xl" resizeMode="cover" />
-                      ) : (
-                        <View className="h-48 w-48 items-center justify-center rounded-xl bg-border">
-                          <ActivityIndicator color={colors.muted} />
-                        </View>
-                      )
-                    ) : (
-                      <Text className={`text-base ${isMine ? 'text-white' : 'text-foreground'}`}>{item.content}</Text>
-                    )}
+            ) : (
+              <FlatList
+                ref={listRef}
+                data={messages}
+                keyExtractor={(item) => item.id}
+                contentContainerStyle={{ padding: 16, flexGrow: 1 }}
+                ListEmptyComponent={
+                  <View className="flex-1 items-center justify-center px-8">
+                    <Text className="text-center text-base text-muted">Say hello to {otherMember?.name ?? 'them'}!</Text>
                   </View>
-                  {isMine && (
-                    <Text className="mt-1 mr-1 text-[10px] text-muted">
-                      {item.read_at ? 'Seen' : 'Sent'}
-                    </Text>
-                  )}
-                </View>
-              );
-            }}
+                }
+                renderItem={({ item }) => {
+                  const isMine = item.sender_id === user?.id;
+                  return (
+                    <View className={`mb-3 max-w-[80%] ${isMine ? 'self-end items-end' : 'self-start items-start'}`}>
+                      <View
+                        className={`rounded-2xl px-4 py-3 ${
+                          isMine ? 'rounded-br-sm bg-primary' : 'rounded-bl-sm border border-border bg-surface'
+                        }`}
+                      >
+                        {item.image_path ? (
+                          item.signed_image_url ? (
+                            <Image source={{ uri: item.signed_image_url }} className="h-48 w-48 rounded-xl" resizeMode="cover" />
+                          ) : (
+                            <View className="h-48 w-48 items-center justify-center rounded-xl bg-border">
+                              <ActivityIndicator color={colors.muted} />
+                            </View>
+                          )
+                        ) : (
+                          <Text className={`text-base ${isMine ? 'text-white' : 'text-foreground'}`}>{item.content}</Text>
+                        )}
+                      </View>
+                      {isMine && (
+                        <Text className="mt-1 mr-1 text-[10px] text-muted">
+                          {item.read_at ? 'Seen' : 'Sent'}
+                        </Text>
+                      )}
+                    </View>
+                  );
+                }}
+              />
+            )}
+
+            {error && (
+              <View className="bg-error/10 px-4 py-2">
+                <Text className="text-sm text-error">{error}</Text>
+              </View>
+            )}
+
+            <View className="flex-row items-center border-t border-border bg-background px-6 py-3 "
+            style={{ paddingBottom: Math.max(insets.bottom, 12) }}>
+              <Pressable onPress={handleImagePick} className="mr-2" hitSlop={8}>
+                <Ionicons name="image-outline" size={24} color={colors.primary} />
+              </Pressable>
+              <TextInput
+                placeholder={`Message ${otherMember?.name?.split(' ')[0] ?? ''}...`}
+                placeholderTextColor={colors.muted}
+                value={input}
+                onChangeText={setInput}
+                multiline
+                className="mr-2 max-h-24 flex-1 rounded-full border border-border bg-surface px-4 py-3 text-base text-foreground"
+              />
+              <Pressable
+                onPress={handleSend}
+                disabled={sending || !input.trim()}
+                className="h-11 w-11 items-center justify-center rounded-full bg-primary"
+                style={{ opacity: sending || !input.trim() ? 0.5 : 1 }}
+              >
+                {sending ? <ActivityIndicator size="small" color="#fff" /> : <Ionicons name="arrow-up" size={20} color="#fff" />}
+              </Pressable>
+            </View>
+
+        </KeyboardAvoidingView>
+        <UpgradePrompt
+          visible={upgradePromptVisible}
+          onClose={() => setUpgradePromptVisible(false)}
+          reason={upgradeReason}
           />
-        )}
-
-        {error && (
-          <View className="bg-error/10 px-4 py-2">
-            <Text className="text-sm text-error">{error}</Text>
-          </View>
-        )}
-
-        <View className="flex-row items-center border-t border-border bg-background px-6 py-3 mb-safe">
-          <Pressable onPress={handleImagePick} className="mr-2" hitSlop={8}>
-            <Ionicons name="image-outline" size={24} color={colors.primary} />
-          </Pressable>
-          <TextInput
-            placeholder={`Message ${otherMember?.name?.split(' ')[0] ?? ''}...`}
-            placeholderTextColor={colors.muted}
-            value={input}
-            onChangeText={setInput}
-            multiline
-            className="mr-2 max-h-24 flex-1 rounded-full border border-border bg-surface px-4 py-3 text-base text-foreground"
-          />
-          <Pressable
-            onPress={handleSend}
-            disabled={sending || !input.trim()}
-            className="h-11 w-11 items-center justify-center rounded-full bg-primary"
-            style={{ opacity: sending || !input.trim() ? 0.5 : 1 }}
-          >
-            {sending ? <ActivityIndicator size="small" color="#fff" /> : <Ionicons name="arrow-up" size={20} color="#fff" />}
-          </Pressable>
-        </View>
-      </KeyboardAvoidingView>
-
-      <UpgradePrompt
-        visible={upgradePromptVisible}
-        onClose={() => setUpgradePromptVisible(false)}
-        reason={upgradeReason}
-      />
     </ScreenContainer>
   );
 }
