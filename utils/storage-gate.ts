@@ -18,13 +18,34 @@ export async function getFileSizeBytes(uri: string): Promise<number> {
   return info.size;
 }
 
-export async function checkStorageBeforeUpload(familyId: string, fileSizeBytes: number) {
-  const { data, error } = await supabase.functions.invoke('check-storage-quota', {
-    body: { family_id: familyId, file_size_bytes: fileSizeBytes },
-  });
-  if (error || !data?.allowed) {
-    throw new StorageLimitError(data?.usedBytes ?? 0, data?.limitBytes ?? 0);
+export async function checkStorageBeforeUpload(
+  familyId: string,
+  fileSizeBytes: number
+) {
+  const { data, error } = await supabase.functions.invoke(
+    'check-storage-quota',
+    {
+      body: {
+        family_id: familyId,
+        file_size_bytes: fileSizeBytes,
+      },
+    }
+  );
+
+
+  if (error) {
+    console.log('FUNCTION ERROR');
+    throw error;
   }
+
+  if (data?.allowed !== true) {
+    throw new StorageLimitError(
+      data?.usedBytes ?? 0,
+      data?.limitBytes ?? 0
+    );
+  }
+
+  return true;
 }
 
 // Called AFTER a successful upload — records both the ledger entry and the running total

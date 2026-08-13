@@ -297,7 +297,6 @@ export const useFamilyStore = create<FamilyState>((set, get) => ({
         .single();
 
       if (error) throw error;
-
       set((state) => ({
         members: state.members.map((m) => (m.id === memberId ? data : m)),
         currentMember: state.currentMember?.id === memberId ? { ...state.currentMember, ...data } : state.currentMember,

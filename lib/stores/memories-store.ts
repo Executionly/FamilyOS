@@ -201,9 +201,11 @@ export const useMemoriesStore = create<MemoriesState>((set) => ({
     set({ uploading: true });
     try {
       const fileSizeBytes = await getFileSizeBytes(fileUri);
+
       await checkStorageBeforeUpload(familyId, fileSizeBytes);
 
       if (mediaType === 'video') {
+        console.log("VID")
         await checkVideoQuota(familyId); // separate check, video-specific
       }
 
@@ -231,7 +233,7 @@ export const useMemoriesStore = create<MemoriesState>((set) => ({
 
       return storagePath;
     } catch (error) {
-       if (error instanceof StorageLimitError || error instanceof VideoLimitError) {
+      if (error instanceof StorageLimitError || error instanceof VideoLimitError) {
         set({ uploading: false });
         throw error;
       }

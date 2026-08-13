@@ -2,7 +2,7 @@ import Purchases from 'react-native-purchases';
 import { Platform } from 'react-native';
 
 const REVENUECAT_API_KEY_IOS = 'appl_xxx';
-const REVENUECAT_API_KEY_ANDROID = process.env.EXPO_PUBLIC_REVENUECAT_API_KEY_ANDROID;
+const REVENUECAT_API_KEY_ANDROID = process.env.EXPO_PUBLIC_REVENUECAT_API_KEY_ANDROID || '';
 let purchasesInitialized = false;
 export function initPurchases(familyId: string) {
   if (purchasesInitialized) return;

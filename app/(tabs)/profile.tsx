@@ -7,6 +7,7 @@ import { useFamilyStore } from '@/lib/stores/family-store';
 import { ScreenContainer } from '@/components/screen-container';
 import { isAdminAccess } from '@/utils';
 import { useEffect, useState } from 'react';
+import { TierBadge } from '@/components/ui/tier-badge';
 
 type MenuItem = {
   icon: keyof typeof Ionicons.glyphMap;
@@ -109,6 +110,9 @@ export default function ProfileScreen() {
             {/* Family name + member info, pushed down to clear the overlapping badge */}
           <View className="mt-10 items-center px-6 pb-4">
             <Text className="text-2xl font-bold text-foreground">{family?.name ?? 'Your Family'}</Text>
+            <View className='bg-primary p-0 rounded-full'>
+              <TierBadge tier={family?.subscription_tier} />
+            </View>
             {currentMember?.name && (
               <Text className="mt-1 text-sm text-muted">
                 Signed in as {currentMember.name} · {currentMember.role}

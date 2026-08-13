@@ -288,18 +288,23 @@ export default function CreateEventScreen() {
             </View>
           )}
 
-          <Pressable
-            onPress={handleCreate}
-            disabled={loading}
-            className="py-4 mb-2 rounded-lg items-center"
-            style={{ 
-              backgroundColor: colors.primary, 
-              opacity: loading ? 0.6 : 1,
+          <View
+          style={{
               paddingBottom: Math.max(insets.bottom, 12)
-            }}
-          >
-            {loading ? <ActivityIndicator color="white" /> : <Text className="text-white font-semibold text-lg">Create Event</Text>}
-          </Pressable>
+            }}>
+            <Pressable
+              onPress={handleCreate}
+              disabled={loading}
+              className="py-4 mb-2 rounded-lg items-center"
+              style={{ 
+                backgroundColor: colors.primary, 
+                opacity: loading ? 0.6 : 1,
+              }}
+            >
+              {loading ? <ActivityIndicator color="white" /> : <Text className="text-white font-semibold text-lg">Create Event</Text>}
+            </Pressable>
+
+          </View>
         </View>
       </ScrollView>
     </ScreenContainer>

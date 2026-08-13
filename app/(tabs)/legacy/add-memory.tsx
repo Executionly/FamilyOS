@@ -131,8 +131,8 @@ export default function AddMemoryScreen() {
       if (pickedFile) {
         storagePath = await uploadMemoryMedia(
           family.id,
-          user.id,
-          pickedFile.uri,
+          pickedFile.uri, // ✅ fileUri
+          user.id,        // ✅ userId
           pickedFile.mimeType,
           pickedFile.fileName,
           memoryType === 'clip' ? 'video' : 'photo'

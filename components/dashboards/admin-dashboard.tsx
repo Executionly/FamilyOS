@@ -18,6 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { FamilyChatFab } from '@/components/family-chat-fab';
 import { useNotificationStore } from '@/lib/stores/notification-store';
 import { Dimensions } from 'react-native';
+import { TierBadge } from '../ui/tier-badge';
 
 // ── Brand palette ────────────────────────────────────────────
 const NAVY = '#044768';
@@ -157,36 +158,6 @@ function SectionHeader({ title, action, onAction }: { title: string; action?: st
   );
 }
 
-// ── Subscription tier badge ─────────────────────────────────────
-
-function TierBadge({ tier }: { tier?: string }) {
-  const isPremium = tier === 'premium';
-  return (
-    <View
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        alignSelf: 'flex-start',
-        marginTop: 8,
-        paddingHorizontal: 10,
-        paddingVertical: 5,
-        borderRadius: 20,
-        backgroundColor: isPremium ? CORAL : 'rgba(255,255,255,0.15)',
-        gap: 5,
-      }}
-    >
-      <Ionicons
-        name={isPremium ? 'sparkles' : 'ellipse-outline'}
-        size={11}
-        color="#fff"
-      />
-      <Text style={{ fontSize: 10, fontWeight: '800', color: '#fff', letterSpacing: 0.3 }}>
-        {isPremium ? 'PREMIUM' : 'FREE PLAN'}
-      </Text>
-    </View>
-  );
-}
-
 // ── Main screen ───────────────────────────────────────────────
 
 export default function AdminDashboard() {
@@ -285,13 +256,13 @@ export default function AdminDashboard() {
         <View style={{
           backgroundColor: NAVY,
           paddingHorizontal: 24,
-          paddingTop: 20,
+          paddingTop: 10,
           paddingBottom: 32,
         }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <View style={{ flex: 1 }}>
               <View className="flex-row items-center">
-                <Text className='mr-2'
+                <Text className='mr-2 mt-2'
                 style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13, fontWeight: '500' }}>
                   {now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
                 </Text>

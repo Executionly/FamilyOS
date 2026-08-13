@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { View, Text, Pressable, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, Pressable, ScrollView, ActivityIndicator, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { ScreenContainer } from '@/components/screen-container';
@@ -16,6 +16,7 @@ const FEATURES = [
   { icon: 'compass-outline', text: 'Family mission, vision & values builder' },
   { icon: 'book-outline', text: 'Full family legacy & story building tools' },
   { icon: 'cloud-outline', text: 'Unlimited photo & memory storage' },
+  { icon: 'person-add-outline', text: 'Add more family members and grow your family space together' },
 ];
 
 export default function PaywallScreen() {
@@ -44,6 +45,10 @@ export default function PaywallScreen() {
 
   useEffect(() => {
     if (!initDone || !family?.id) return;
+    if(Platform.OS === "ios") {
+      setLoading(false)
+      return
+    }
     (async () => {
       setLoading(true);
       try {
@@ -225,7 +230,7 @@ export default function PaywallScreen() {
 
         <Pressable
           onPress={handlePurchase}
-          disabled={purchasing || confirming || !selectedPackage}
+          disabled={purchasing || confirming || !selectedPackage || Platform.OS === "ios"}
           className="items-center rounded-2xl bg-primary py-4"
         >
           {purchasing || confirming ? (
@@ -240,7 +245,7 @@ export default function PaywallScreen() {
           )}
         </Pressable>
 
-        <Pressable onPress={handleRestore} disabled={purchasing} className="mt-4 items-center">
+        <Pressable onPress={handleRestore} disabled={purchasing || Platform.OS === "ios"} className="mt-4 items-center">
           <Text className="text-xs font-semibold text-muted">Restore Purchases</Text>
         </Pressable>
       </ScrollView>

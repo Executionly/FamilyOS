@@ -125,7 +125,7 @@ export const useCalendarStore = create<CalendarState>((set, get) => ({
         .insert([{ family_id: familyId, created_by: createdBy, ...event }])
         .select()
         .single();
-
+console.log("error", error)
       if (error) throw error;
       // set((state) => ({ events: [data, ...state.events], error: null }));
       await notifyFamily({

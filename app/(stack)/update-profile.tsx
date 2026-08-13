@@ -66,7 +66,7 @@ export default function AccountSettingsScreen() {
           .select('date_of_birth, bio, phone_number, avatar_url')
           .eq('id', memberProfileId)
           .single();
-  
+
         if (memberData) {
           setMemberAvatar(memberData?.avatar_url)
           setDateOfBirth(memberData.date_of_birth ? new Date(memberData.date_of_birth) : null);
@@ -141,7 +141,7 @@ export default function AccountSettingsScreen() {
       return;
     }
     if (!userId || !user?.id || !memberProfileId) return;
-
+console.log("dateOfBirth",dateOfBirth)
     try {
       await updateProfile(userId, {
         fullName: fullName.trim(),

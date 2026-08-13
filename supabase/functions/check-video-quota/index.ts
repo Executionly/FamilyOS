@@ -8,8 +8,23 @@ serve(async (req) => {
   try {
     const { family_id } = await req.json();
     const result = await checkVideoEntitlement(supabase, family_id);
-    return new Response(JSON.stringify(result), { status: result.allowed ? 200 : 402 });
+    return new Response(JSON.stringify(result), {
+      status: result.allowed ? 200 : 402,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
   } catch (err) {
-    return new Response(JSON.stringify({ error: err.message }), { status: 500 });
+     return new Response(
+      JSON.stringify({
+        error: err instanceof Error ? err.message : 'Unknown error',
+      }),
+      {
+        status: 500,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }
+    );
   }
 });

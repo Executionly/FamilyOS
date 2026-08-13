@@ -9,7 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { ScreenContainer } from '@/components/screen-container';
 import { useOnboardingStore } from '@/lib/stores/onboarding-store';
 import { useColors } from '@/hooks/use-colors';
-import { AgeBand, MemberRole, PRESET_AGE_BANDS, PRESET_ROLES } from '@/utils';
+import { AgeBand, memberLimit, MemberRole, PRESET_AGE_BANDS, PRESET_ROLES } from '@/utils';
 
 
 export const ROLE_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
@@ -285,9 +285,14 @@ export default function AddMembersScreen() {
   const allAgeBands = [...PRESET_AGE_BANDS, ...customAgeBands];
   const showAgeBand = ['child', 'member', ...customRoles].includes(role) ||
     !PRESET_ROLES.includes(role);
+  const atLimit = (members?.length ?? 0) >= memberLimit;
 
   const handleAddMember = () => {
     setError(null);
+    if (atLimit) {
+      setError('You can add up to 4 family members on your current plan.');
+      return;
+    }
     if (!name?.trim()) {
       setError('Member name is required');
       return;
