@@ -185,7 +185,7 @@ export default function CalendarScreen() {
           </View>
 
           {/* Events for Selected Day */}
-          <View className="mb-6">
+          <View className="mb-3">
             <Text className="text-lg font-semibold text-foreground mb-3">
               {selectedDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
             </Text>
@@ -203,7 +203,10 @@ export default function CalendarScreen() {
                   const catInfo = CATEGORIES.find((c) => c.key === item.category) ?? CATEGORIES[0];
                   const isFullDay = ['birthday', 'anniversary'].includes(item.category);
                   return (
-                    <View className="mb-3 rounded-2xl border border-border p-4" style={{ backgroundColor: colors.surface }}>
+                    <Pressable
+                    disabled={item.category === 'birthday'}
+                    onPress={() => router.push(`/(stack)/create-event?eventId=${item.id}`)} 
+                    className="mb-3 rounded-2xl border border-border p-4" style={{ backgroundColor: colors.surface }}>
                       <View className="flex-row items-start gap-3">
                         <View
                           className="mt-1.5 h-3 w-3 rounded-full"
@@ -230,7 +233,7 @@ export default function CalendarScreen() {
                           )}
                         </View>
                       </View>
-                    </View>
+                    </Pressable>
                   );
                 }}
               />
@@ -239,7 +242,7 @@ export default function CalendarScreen() {
         </View>
       </ScrollView>
 
-      <View className="px-6"
+      <View className="px-6 mb-4"
       style={{ paddingBottom: Math.max(insets.bottom, 12) }}>
         <Pressable
           onPress={handleAddEvent}

@@ -141,7 +141,7 @@ export default function AccountSettingsScreen() {
       return;
     }
     if (!userId || !user?.id || !memberProfileId) return;
-console.log("dateOfBirth",dateOfBirth)
+
     try {
       await updateProfile(userId, {
         fullName: fullName.trim(),
@@ -155,6 +155,7 @@ console.log("dateOfBirth",dateOfBirth)
       });
       await fetchFamilyForUser(user?.id);
       setSuccessMessage('Profile updated');
+      setShowDobPicker(false)
       setTimeout(() => setSuccessMessage(null), 2500);
     } catch {
       // error already in store

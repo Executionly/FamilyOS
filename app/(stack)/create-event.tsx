@@ -1,4 +1,4 @@
-import { ScrollView, Text, View, Pressable, TextInput, ActivityIndicator } from 'react-native';
+import { ScrollView, Text, View, Pressable, TextInput, ActivityIndicator, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -10,16 +10,27 @@ import { AppHeader } from '@/components/app-header';
 import { Ionicons } from '@expo/vector-icons';
 import { CATEGORIES, EventCategory, RECURRING_PERSON_CATEGORIES } from '@/constants/event-categories';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSubscriptionStore } from '@/lib/stores/subscription-store';
+import { useLocalSearchParams } from 'expo-router';
 
 
 const COLORS = ['#F59E0B', '#3B82F6', '#10B981', '#EF4444', '#8B5CF6', '#EC4899'];
+
+type Recurrence = 'none' | 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'bimonthly' | 'quaterly' | 'annually';
+
+const LOCKED_RECURRENCE_OPTIONS: Recurrence[] = ['monthly', 'bimonthly', 'quaterly', 'annually'];
+const ALL_RECURRENCE_OPTIONS: Recurrence[] = ['none', 'daily', 'weekly', 'biweekly', 'monthly', 'bimonthly', 'quaterly', 'annually'];
 
 export default function CreateEventScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const colors = useColors();
   const { family, members } = useFamilyStore();
-  const { createEvent, loading } = useCalendarStore();
+  const { events, createEvent, updateEvent, loading } = useCalendarStore();
+
+
+  const { eventId } = useLocalSearchParams<{ eventId?: string }>();
+  const isEditMode = !!eventId;
 
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState<EventCategory>('general');
@@ -27,22 +38,40 @@ export default function CreateEventScreen() {
   const [endDate, setEndDate] = useState(new Date(Date.now() + 3600000));
   const [location, setLocation] = useState('');
   const [selectedColor, setSelectedColor] = useState(COLORS[0]);
-  const [recurrence, setRecurrence] = useState<'none' | 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'bimonthly' | 'quaterly' | 'annually'>('none');
+  const [recurrence, setRecurrence] = useState<Recurrence>('none');
   const [relatedMemberIds, setRelatedMemberIds] = useState<string[]>([]);
   const [showStartDatePicker, setShowStartDatePicker] = useState(false);
   const [showStartTimePicker, setShowStartTimePicker] = useState(false);
   const [showEndDatePicker, setShowEndDatePicker] = useState(false);
   const [showEndTimePicker, setShowEndTimePicker] = useState(false);
 
+  const isPremium = family?.subscription_tier === 'premium';
   const isPersonCategory = RECURRING_PERSON_CATEGORIES.includes(category);
   const maxRelatedMembers = category === 'anniversary' ? 2 : category === 'birthday' ? 1 : undefined;
 
-  // Auto-set sensible defaults when switching into a person-category
+  // Prefill from the existing event when editing
   useEffect(() => {
-    if (isPersonCategory && recurrence === 'none') {
+    if (!isEditMode) return;
+    const existing = events.find((e) => e.id === eventId);
+    if (!existing) return;
+
+    setTitle(existing.title);
+    setCategory(existing.category);
+    setStartDate(new Date(existing.start_date));
+    setEndDate(new Date(existing.end_date));
+    setLocation(existing.location ?? '');
+    setSelectedColor(existing.color ?? COLORS[0]);
+    setRecurrence((existing.recurrence as Recurrence) ?? 'none');
+    setRelatedMemberIds(existing.related_member_ids ?? []);
+  }, [isEditMode, eventId, events]);
+
+  // Auto-set sensible defaults when switching into a person-category (create mode only —
+  // don't fight the prefill effect above when editing)
+  useEffect(() => {
+    if (!isEditMode && isPersonCategory && recurrence === 'none') {
       setRecurrence('annually');
     }
-  }, [category]);
+  }, [category, isEditMode]);
 
   const toggleRelatedMember = (memberId: string) => {
     setRelatedMemberIds((prev) => {
@@ -54,61 +83,76 @@ export default function CreateEventScreen() {
     });
   };
 
+  const handleRecurrencePress = (r: Recurrence) => {
+    if (LOCKED_RECURRENCE_OPTIONS.includes(r) && !isPremium) {
+      router.push('/(stack)/paywall');
+      return;
+    }
+    setRecurrence(r);
+  };
+
   const handleStartDateChange = (event: any, date?: Date) => {
     if (date) setStartDate(date);
     setShowStartDatePicker(false);
   };
   const handleStartTimeChange = (event: any, date?: Date) => {
     if (date) setStartDate(date);
-    setShowStartTimePicker(false);
+    if (Platform.OS !== 'ios') setShowStartTimePicker(false);
+  };
+  const handleEndTimeChange = (event: any, date?: Date) => {
+    if (date) setEndDate(date);
+    if (Platform.OS !== 'ios') setShowEndTimePicker(false);
   };
   const handleEndDateChange = (event: any, date?: Date) => {
     if (date) setEndDate(date);
     setShowEndDatePicker(false);
   };
-  const handleEndTimeChange = (event: any, date?: Date) => {
-    if (date) setEndDate(date);
-    setShowEndTimePicker(false);
-  };
 
-  const handleCreate = async () => {
+  const handleSubmit = async () => {
     if (!title?.trim() || !family?.id) {
       alert('Please enter an event title');
       return;
     }
 
-    try {
-      await createEvent(family.id, family.created_by, {
-        title,
-        category,
-        start_date: startDate.toISOString(),
-        end_date: isPersonCategory ? new Date(startDate.getTime() + 86400000).toISOString() : endDate.toISOString(),
-        location: isPersonCategory ? undefined : (location || undefined),
-        color: selectedColor,
-        recurrence,
-        related_member_ids: relatedMemberIds.length > 0 ? relatedMemberIds : undefined,
-      });
+    const payload = {
+      title,
+      category,
+      start_date: startDate.toISOString(),
+      end_date: isPersonCategory ? new Date(startDate.getTime() + 86400000).toISOString() : endDate.toISOString(),
+      location: isPersonCategory ? undefined : (location || undefined),
+      color: selectedColor,
+      recurrence,
+      related_member_ids: relatedMemberIds.length > 0 ? relatedMemberIds : undefined,
+    };
 
+    try {
+      if (isEditMode && eventId) {
+        await updateEvent(eventId, payload);
+      } else {
+        await createEvent(family.id, family.created_by, payload);
+      }
       router.back();
     } catch (error) {
-      console.error('Error creating event:', error);
-      alert('Failed to create event');
+      console.error(isEditMode ? 'Error updating event:' : 'Error creating event:', error);
+      alert(isEditMode ? 'Failed to update event' : 'Failed to create event');
     }
   };
 
   return (
     <ScreenContainer containerClassName="bg-background" safeAreaClassName="bg-background">
-      <AppHeader title="Create Event" showBack />
+      <AppHeader title={isEditMode ? 'Edit Event' : 'Create Event'} showBack />
       <ScrollView contentContainerStyle={{ flexGrow: 1 }} showsVerticalScrollIndicator={false}>
         <View className="flex-1 px-6 pb-8">
 
-          <View className="mb-4 rounded-2xl border border-primary bg-primary/5 p-3">
-            <Text className="text-sm font-semibold text-foreground">Track more than birthdays</Text>
-            <Text className="mt-1 text-xs leading-5 text-muted">
-              Use your calendar for school schedules, medical appointments, travel plans, bills, birthdays,
-              anniversaries, and anything else your family needs to stay on top of.
-            </Text>
-          </View>
+          {!isEditMode && (
+            <View className="mb-4 rounded-2xl border border-primary bg-primary/5 p-3">
+              <Text className="text-sm font-semibold text-foreground">Track more than birthdays</Text>
+              <Text className="mt-1 text-xs leading-5 text-muted">
+                Use your calendar for school schedules, medical appointments, travel plans, bills, birthdays,
+                anniversaries, and anything else your family needs to stay on top of.
+              </Text>
+            </View>
+          )}
 
           {/* Category */}
           <View className="mb-6">
@@ -170,7 +214,8 @@ export default function CreateEventScreen() {
             />
           </View>
 
-          {/* Date — simplified for person categories (date only, no time-of-day) */}
+          {/* Date */}
+          {/* Date — matches the DOB pattern */}
           <View className="mb-6">
             <Text className="text-sm font-semibold text-foreground mb-2">
               {isPersonCategory ? 'Date' : 'Start Date & Time'}
@@ -196,14 +241,35 @@ export default function CreateEventScreen() {
               )}
             </View>
             {showStartDatePicker && (
-              <DateTimePicker value={startDate} mode="date" display="default" onChange={handleStartDateChange} />
+              <DateTimePicker
+                value={startDate}
+                mode="date"
+                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                onChange={handleStartDateChange}
+              />
             )}
             {showStartTimePicker && (
-              <DateTimePicker value={startDate} mode="time" display="default" onChange={handleStartTimeChange} />
+              <View>
+                <DateTimePicker
+                  value={startDate}
+                  mode="time"
+                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                  onChange={handleStartTimeChange}
+                />
+                {Platform.OS === 'ios' && (
+                  <Pressable
+                    onPress={() => setShowStartTimePicker(false)}
+                    className="mt-2 items-center rounded-lg py-2"
+                    style={{ backgroundColor: colors.primary }}
+                  >
+                    <Text className="text-sm font-semibold text-white">Done</Text>
+                  </Pressable>
+                )}
+              </View>
             )}
           </View>
 
-          {/* End Date & Time — hidden entirely for person categories */}
+          {/* End Date & Time */}
           {!isPersonCategory && (
             <View className="mb-6">
               <Text className="text-sm font-semibold text-foreground mb-2">End Date & Time</Text>
@@ -226,15 +292,33 @@ export default function CreateEventScreen() {
                 </Pressable>
               </View>
               {showEndDatePicker && (
-                <DateTimePicker value={endDate} mode="date" display="default" onChange={handleEndDateChange} />
+                <DateTimePicker 
+                value={endDate} mode="date" 
+                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                onChange={handleEndDateChange} />
               )}
               {showEndTimePicker && (
-                <DateTimePicker value={endDate} mode="time" display="default" onChange={handleEndTimeChange} />
+                <View>
+                  <DateTimePicker 
+                  value={endDate} 
+                  mode="time" 
+                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                  onChange={handleEndTimeChange} />
+                  {Platform.OS === 'ios' && (
+                    <Pressable
+                      onPress={() => setShowStartTimePicker(false)}
+                      className="mt-2 items-center rounded-lg py-2"
+                      style={{ backgroundColor: colors.primary }}
+                    >
+                      <Text className="text-sm font-semibold text-white">Done</Text>
+                    </Pressable>
+                  )}
+                </View>
               )}
             </View>
           )}
 
-          {/* Location — hidden for person categories */}
+          {/* Location */}
           {!isPersonCategory && (
             <View className="mb-6">
               <Text className="text-sm font-semibold text-foreground mb-2">Location</Text>
@@ -264,22 +348,40 @@ export default function CreateEventScreen() {
             </View>
           </View>
 
-          {/* Recurrence — locked to annually for person categories, since that's the whole point */}
+          {/* Recurrence — locked to annually for person categories; free tier capped at biweekly otherwise */}
           {!isPersonCategory ? (
             <View className="mb-8">
               <Text className="text-sm font-semibold text-foreground mb-3">Recurrence</Text>
               <View className="flex-row gap-2 flex-wrap">
-                {(['none', 'daily', 'weekly', 'biweekly', 'monthly', 'bimonthly', 'quaterly', 'annually'] as const).map((r) => (
-                  <Pressable
-                    key={r}
-                    onPress={() => setRecurrence(r)}
-                    className={`px-3 py-2 rounded-lg border ${recurrence === r ? 'border-primary' : 'border-border'}`}
-                    style={{ backgroundColor: recurrence === r ? colors.primary : colors.surface }}
-                  >
-                    <Text className={`text-xs font-semibold capitalize ${recurrence === r ? 'text-white' : 'text-foreground'}`}>{r}</Text>
-                  </Pressable>
-                ))}
+                {ALL_RECURRENCE_OPTIONS.map((r) => {
+                  const isLocked = LOCKED_RECURRENCE_OPTIONS.includes(r) && !isPremium;
+                  const selected = recurrence === r;
+                  return (
+                    <Pressable
+                      key={r}
+                      onPress={() => handleRecurrencePress(r)}
+                      className={`flex-row items-center gap-1 px-3 py-2 rounded-lg border ${
+                        selected ? 'border-primary' : 'border-border'
+                      } ${isLocked ? 'opacity-50' : ''}`}
+                      style={{ backgroundColor: selected ? colors.primary : colors.surface }}
+                    >
+                      {isLocked && <Ionicons name="lock-closed" size={10} color={colors.muted} />}
+                      <Text className={`text-xs font-semibold capitalize ${selected ? 'text-white' : 'text-foreground'}`}>
+                        {r}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
               </View>
+              {!isPremium && (
+                <View className="mt-3 flex-row items-start gap-2 rounded-xl bg-primary/5 p-3">
+                  <Ionicons name="lock-closed" size={14} color={colors.primary} style={{ marginTop: 1 }} />
+                  <Text className="flex-1 text-xs leading-5 text-muted">
+                    Free plan events can repeat up to every two weeks. Monthly and longer recurrence is a
+                    Premium feature — tap a locked option to upgrade.
+                  </Text>
+                </View>
+              )}
             </View>
           ) : (
             <View className="mb-8 flex-row items-center rounded-xl bg-primary/5 p-3">
@@ -288,22 +390,24 @@ export default function CreateEventScreen() {
             </View>
           )}
 
-          <View
-          style={{
-              paddingBottom: Math.max(insets.bottom, 12)
-            }}>
+          <View style={{ paddingBottom: Math.max(insets.bottom, 12) }}>
             <Pressable
-              onPress={handleCreate}
+              onPress={handleSubmit}
               disabled={loading}
               className="py-4 mb-2 rounded-lg items-center"
-              style={{ 
-                backgroundColor: colors.primary, 
+              style={{
+                backgroundColor: colors.primary,
                 opacity: loading ? 0.6 : 1,
               }}
             >
-              {loading ? <ActivityIndicator color="white" /> : <Text className="text-white font-semibold text-lg">Create Event</Text>}
+              {loading ? (
+                <ActivityIndicator color="white" />
+              ) : (
+                <Text className="text-white font-semibold text-lg">
+                  {isEditMode ? 'Update Event' : 'Create Event'}
+                </Text>
+              )}
             </Pressable>
-
           </View>
         </View>
       </ScrollView>

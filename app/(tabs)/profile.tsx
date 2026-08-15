@@ -8,24 +8,16 @@ import { ScreenContainer } from '@/components/screen-container';
 import { isAdminAccess } from '@/utils';
 import { useEffect, useState } from 'react';
 import { TierBadge } from '@/components/ui/tier-badge';
+import { UpgradePrompt } from '@/components/upgrade-prompt';
 
 type MenuItem = {
   icon: keyof typeof Ionicons.glyphMap;
   label: string;
   route: string;
-  adminOnly?: boolean;
+  premium?: boolean;
   open: boolean;
 };
 
-const MENU_ITEMS: MenuItem[] = [
-  { icon: 'people-outline', label: 'Family Members', route: '/(stack)/member-list', adminOnly: false, open: true },
-  { icon: 'restaurant-outline', label: 'Meal Planner', route: '/(stack)/meal',open: true },
-  { icon: 'construct-outline', label: 'Manage Chores', route: '/(stack)/chores',open: true },
-  { icon: 'calendar-outline', label: 'Calendar (School schedules, Travel plans...) ', route: '/(stack)/calendar', open: true },
-  { icon: 'images-outline', label: 'Family Media', route: '/(stack)/media-library', open: true },
-  { icon: 'person-outline', label: 'Account Settings', route: '/(stack)/account-settings',open: true  },
-  // { icon: 'person-outline', label: 'Account Settings', route: '/(stack)/paywall',open: true  },
-];
 
 const LEGAL_ITEMS: MenuItem[] = [
   { icon: 'document-text-outline', label: 'Privacy Policy', route: '/(stack)/privacy-policy', open: true },
@@ -39,10 +31,23 @@ export default function ProfileScreen() {
   const { family, currentMember, getAvatarSignedUrl, getFamilyPhotoSignedUrl } = useFamilyStore();
   const [avatarSignedUrl, setAvatarSignedUrl] = useState<string | null>(null);
   const [familyPhotoSignedUrl, setFamilyPhotoSignedUrl] = useState<string | null>(null);
+  const [upgradePromptVisible, setUpgradePromptVisible] = useState(false);
+  const [upgradeReason, setUpgradeReason] = useState<'ai_feature' | 'module_limit'>('module_limit');
 
+  const isPremium = family?.subscription_tier === 'premium';
   const isAdmin = isAdminAccess(currentMember?.role)
 
-  const visibleItems = MENU_ITEMS.filter((item) => !item.adminOnly || isAdmin);
+  const MENU_ITEMS: MenuItem[] = [
+    { icon: 'people-outline', label: 'Family Members', route: '/(stack)/member-list', open: true, premium: true },
+    { icon: 'restaurant-outline', label: 'Meal Planner', route: '/(stack)/meal',open: true, premium: isPremium },
+    { icon: 'construct-outline', label: 'Manage Chores', route: '/(stack)/chores',open: true,premium: true },
+    { icon: 'calendar-outline', label: 'Calendar (School schedules, Travel plans...) ', route: '/(stack)/calendar', open: true, premium: true },
+    { icon: 'images-outline', label: 'Family Media', route: '/(stack)/media-library', open: true, premium: true },
+    { icon: 'person-outline', label: 'Account Settings', route: '/(stack)/account-settings',open: true, premium: true },
+    // { icon: 'person-outline', label: 'Account Settings', route: '/(stack)/paywall',open: true  },
+  ];
+
+  const visibleItems = MENU_ITEMS.filter((item) => !item.premium || isAdmin);
 
   const handleSignout = () => {
     signOut()
@@ -68,6 +73,11 @@ export default function ProfileScreen() {
     };
     resolveFamilyPhoto();
   }, [family?.photo_url]);
+
+  const openPremiumModal = () => {
+    setUpgradePromptVisible(true)
+    setUpgradeReason('module_limit')
+  }
 
   return (
     <ScreenContainer containerClassName="bg-background" safeAreaClassName="bg-background">
@@ -114,7 +124,7 @@ export default function ProfileScreen() {
               <TierBadge tier={family?.subscription_tier} />
             </View>
             {currentMember?.name && (
-              <Text className="mt-1 text-sm text-muted">
+              <Text className="mt-1 text-sm text-muted ">
                 Signed in as {currentMember.name} · {currentMember.role}
               </Text>
             )}
@@ -131,7 +141,10 @@ export default function ProfileScreen() {
                   <TouchableOpacity
                   key={item.route}
                   disabled={!item.open}
-                  onPress={() => router.push(item.route as any)}
+                  onPress={() => {
+                    if(!item.premium) openPremiumModal()
+                    else router.push(item.route as any)
+                  }}
                   className={`flex-row items-center justify-between py-5 px-4 bg-surface ${
                       index === 0 ? 'rounded-t-xl' : ''
                   } ${index === visibleItems.length - 1 ? 'rounded-b-xl' : 'border-b border-border'}`}
@@ -141,7 +154,11 @@ export default function ProfileScreen() {
                       <Ionicons name={item.icon} size={20} color={colors.foreground} />
                       <Text className="text-base text-foreground ml-3">{item.label}</Text>
                   </View>
-                  <Ionicons name="chevron-forward" size={18} color={colors.muted} />
+                  <View className="flex-row items-center">
+                    {!item.premium && <Ionicons name="lock-closed" size={10} 
+                    color={colors.muted} style={{marginRight: 2}} />}
+                    <Ionicons name="chevron-forward" size={18} color={colors.muted} />
+                  </View>
                   </TouchableOpacity>
               ))}
             </View>
@@ -182,6 +199,12 @@ export default function ProfileScreen() {
         </View>
 
       </ScrollView>
+
+      <UpgradePrompt
+        visible={upgradePromptVisible}
+        onClose={() => setUpgradePromptVisible(false)}
+        reason={upgradeReason}
+      />
     </ScreenContainer>
   );
 }

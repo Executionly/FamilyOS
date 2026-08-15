@@ -8,7 +8,7 @@ import { useFamilyStore } from '@/lib/stores/family-store';
 interface UpgradePromptProps {
   visible: boolean;
   onClose: () => void;
-  reason: 'ai_feature' | 'storage_limit' | 'quota_exceeded' | 'video_limit' | 'member_limit';
+  reason: 'ai_feature' | 'storage_limit' | 'quota_exceeded' | 'video_limit' | 'member_limit' | 'module_limit';
   usedBytes?: number;
   limitBytes?: number;
   videoLimit?: number;
@@ -35,6 +35,10 @@ const COPY: Record<UpgradePromptProps['reason'], { title: string; body: string }
   member_limit: {
     title: "You've reached your member limit",
     body: 'Free accounts can have up to 4 family members. Upgrade to Premium to add more.',
+  },
+  module_limit: {
+    title: "You can't access this feature",
+    body: 'This feature is not available for free tier account. Upgrade to Premium to gain access to this feature.',
   },
 };
 

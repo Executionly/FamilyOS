@@ -8,6 +8,7 @@ import { useFamilyStore } from '@/lib/stores/family-store';
 import { getOfferings, initPurchases, purchasePackage, restorePurchases } from '@/lib/purchases';
 import { useSubscriptionStore } from '@/lib/stores/subscription-store';
 import { useAuthStore } from '@/lib/stores/auth-store';
+import { PlanComparisonTable } from '@/components/plan-comparison-table';
 
 const FEATURES = [
   { icon: 'sparkles', text: 'AI Family Assistant that manages your calendar, tasks & more' },
@@ -69,6 +70,7 @@ export default function PaywallScreen() {
   }, [initDone, family?.id]);
 
   const handlePurchase = async () => {
+    console.log("selectedPackage",selectedPackage)
     if (!selectedPackage || !family?.id) return;
     setPurchasing(true);
     setError(null);
@@ -180,6 +182,10 @@ export default function PaywallScreen() {
             </View>
           ))}
         </View>
+        <PlanComparisonTable
+          monthlyPriceString={offering?.monthly?.product?.priceString}
+          annualPriceString={offering?.annual?.product?.priceString}
+        />
 
         {error && (
           <View className="mb-4 rounded-lg border border-error p-3">
@@ -192,7 +198,6 @@ export default function PaywallScreen() {
           {(offering?.availablePackages ?? []).map((pkg: any) => {
             const isSelected = selectedPackage?.identifier === pkg.identifier;
             const isAnnual = pkg.packageType === 'ANNUAL';
-            console.log("PKG", pkg)
             return (
               <Pressable
                 key={pkg.identifier}
