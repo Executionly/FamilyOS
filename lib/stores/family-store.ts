@@ -24,6 +24,7 @@ export interface Member {
   avatar_url?: string;
   signup_code?: string;
   is_founding_admin?: boolean;
+  ai_intro_seen_at?: string;
   date_of_birth?: string | null; 
   bio?: string; 
   phone_number?: string

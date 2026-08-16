@@ -21,6 +21,8 @@ export default function HomeScreen() {
   const { family, currentMember, loading } = useFamilyStore();
   const {initialize, user} = useAuthStore()
   const {fetchPreferences} = useNotificationStore()
+  const isPremium = family?.subscription_tier === "premium"
+
 
   useEffect(()=>{
     initialize()
@@ -34,10 +36,14 @@ export default function HomeScreen() {
   const isAdmin = isAdminAccess(currentMember?.role)
 
   useEffect(() => {
-    if (family?.id && user?.id) {
-      useBriefingStore.getState().checkBriefing(family.id, user.id);
+    if (family?.id && user?.id && currentMember?.id) {
+      useBriefingStore.getState().checkBriefing(family.id, user?.id, {
+        memberId: currentMember.id,
+        isPremium,
+        hasSeenAiIntro: !!currentMember.ai_intro_seen_at,
+      });
     }
-  }, [family?.id, user?.id]);
+  }, [family?.id, user?.id, currentMember?.id, isPremium]);
 
   if (loading) {
     return (

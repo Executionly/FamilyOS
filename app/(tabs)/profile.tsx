@@ -1,6 +1,6 @@
 import { View, Text, TouchableOpacity, ScrollView, Pressable, Image } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useColors } from '@/hooks/use-colors';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { useFamilyStore } from '@/lib/stores/family-store';
@@ -9,6 +9,8 @@ import { isAdminAccess } from '@/utils';
 import { useEffect, useState } from 'react';
 import { TierBadge } from '@/components/ui/tier-badge';
 import { UpgradePrompt } from '@/components/upgrade-prompt';
+import { DeleteAccountModal } from '@/components/modals/delete-account-modal';
+import { LinearGradient } from 'expo-linear-gradient';
 
 type MenuItem = {
   icon: keyof typeof Ionicons.glyphMap;
@@ -33,6 +35,7 @@ export default function ProfileScreen() {
   const [familyPhotoSignedUrl, setFamilyPhotoSignedUrl] = useState<string | null>(null);
   const [upgradePromptVisible, setUpgradePromptVisible] = useState(false);
   const [upgradeReason, setUpgradeReason] = useState<'ai_feature' | 'module_limit'>('module_limit');
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   const isPremium = family?.subscription_tier === 'premium';
   const isAdmin = isAdminAccess(currentMember?.role)
@@ -79,132 +82,233 @@ export default function ProfileScreen() {
     setUpgradeReason('module_limit')
   }
 
-  return (
-    <ScreenContainer containerClassName="bg-background" safeAreaClassName="bg-background">
-      <ScrollView showsVerticalScrollIndicator={false} 
-      className="flex-1">
-        <View className='flex-1'>
-          {/* Family cover photo */}
-          <View className="items-center">
-            <View className="h-40 w-full">
-              {familyPhotoSignedUrl ? (
-                <Image source={{ uri: familyPhotoSignedUrl }} 
-                className="h-40 w-full" 
-                resizeMode='cover'
-                />
-              ) : (
-                <View className="h-40 w-full items-center justify-center bg-primary">
-                  <Text className="text-4xl font-bold text-white/90">
-                    {family?.name?.charAt(0)?.toUpperCase() ?? 'F'}
-                  </Text>
-                </View>
-              )}
-            </View>
 
-            {/* Member avatar badge, overlapping bottom-right of the cover */}
-            <View className="absolute bottom-[-28px] right-6">
-              {avatarSignedUrl ? (
-                <Image
-                  source={{ uri: avatarSignedUrl }}
-                  className="h-20 w-20 rounded-full border-4 border-background"
-                />
-              ) : (
-                <View className="h-20 w-20 items-center justify-center rounded-full border-4 border-background bg-primary">
-                  <Text className="text-xl font-bold text-white">
-                    {currentMember?.name?.charAt(0)?.toUpperCase() ?? '?'}
-                  </Text>
-                </View>
-              )}
-            </View>
-          </View>
-            {/* Family name + member info, pushed down to clear the overlapping badge */}
-          <View className="mt-10 items-center px-6 pb-4">
-            <Text className="text-2xl font-bold text-foreground">{family?.name ?? 'Your Family'}</Text>
-            <View className='bg-primary p-0 rounded-full'>
-              <TierBadge tier={family?.subscription_tier} />
-            </View>
-            {currentMember?.name && (
-              <Text className="mt-1 text-sm text-muted ">
-                Signed in as {currentMember.name} · {currentMember.role}
-              </Text>
+return (
+  <ScreenContainer containerClassName="bg-background" safeAreaClassName="bg-background">
+    <ScrollView showsVerticalScrollIndicator={false} className="flex-1">
+      <View className="flex-1">
+        {/* Hero cover */}
+        <View className="items-center">
+          <View className="h-48 w-full overflow-hidden">
+            {familyPhotoSignedUrl ? (
+              <Image source={{ uri: familyPhotoSignedUrl }} className="h-48 w-full" resizeMode="cover" />
+            ) : (
+              <LinearGradient
+                colors={[colors.primary, 'rgba(0,0,0,0.35)']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={{ height: 192, width: '100%', alignItems: 'center', justifyContent: 'center' }}
+              >
+                <Text className="text-5xl font-bold text-white/90">
+                  {family?.name?.charAt(0)?.toUpperCase() ?? 'F'}
+                </Text>
+              </LinearGradient>
             )}
-            <Pressable 
-              onPress={() => router.push('/(stack)/family-settings')} 
-              className="mt-3">
-                <Text className="text-sm font-semibold text-primary">Edit family name & photo</Text>
-            </Pressable>
+            {/* Scrim so the avatar/name area reads clearly regardless of photo brightness */}
+            <LinearGradient
+              colors={['transparent', 'rgba(0,0,0,0.28)']}
+              style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 64 }}
+            />
           </View>
 
-            {/* Menu list */}
-            <View className="px-4">
-              {visibleItems.map((item, index) => (
-                  <TouchableOpacity
-                  key={item.route}
-                  disabled={!item.open}
-                  onPress={() => {
-                    if(!item.premium) openPremiumModal()
-                    else router.push(item.route as any)
-                  }}
-                  className={`flex-row items-center justify-between py-5 px-4 bg-surface ${
-                      index === 0 ? 'rounded-t-xl' : ''
-                  } ${index === visibleItems.length - 1 ? 'rounded-b-xl' : 'border-b border-border'}`}
-                  style={{ backgroundColor: colors.surface, borderColor: colors.border }}
+          {/* Avatar — gold ring for premium, neutral for free */}
+          <View className="absolute bottom-[-32px] right-6">
+            <View
+              className="rounded-full p-1"
+              style={{ backgroundColor: colors.background }}
+            >
+              <View
+                className="rounded-full p-[3px]"
+                style={{ backgroundColor: isPremium ? '#F59E0B' : colors.border }}
+              >
+                {avatarSignedUrl ? (
+                  <Image source={{ uri: avatarSignedUrl }} className="h-20 w-20 rounded-full" />
+                ) : (
+                  <View
+                    className="h-20 w-20 items-center justify-center rounded-full"
+                    style={{ backgroundColor: colors.primary }}
                   >
-                  <View className="flex-row items-center">
-                      <Ionicons name={item.icon} size={20} color={colors.foreground} />
-                      <Text className="text-base text-foreground ml-3">{item.label}</Text>
-                  </View>
-                  <View className="flex-row items-center">
-                    {!item.premium && <Ionicons name="lock-closed" size={10} 
-                    color={colors.muted} style={{marginRight: 2}} />}
-                    <Ionicons name="chevron-forward" size={18} color={colors.muted} />
-                  </View>
-                  </TouchableOpacity>
-              ))}
-            </View>
-
-            {/* Legal */}
-            <View className="px-4 mt-4">
-              {LEGAL_ITEMS.map((item, index) => (
-                <TouchableOpacity
-                  key={item.route}
-                  disabled={!item.open}
-                  onPress={() => router.push(item.route as any)}
-                  className={`flex-row items-center justify-between py-5 px-4 bg-surface ${
-                    index === 0 ? 'rounded-t-xl' : ''
-                  } ${index === LEGAL_ITEMS.length - 1 ? 'rounded-b-xl' : 'border-b border-border'}`}
-                  style={{ backgroundColor: colors.surface, borderColor: colors.border }}
-                >
-                  <View className="flex-row items-center">
-                    <Ionicons name={item.icon} size={20} color={colors.foreground} />
-                    <Text className="text-base text-foreground ml-3">{item.label}</Text>
-                  </View>
-                  <Ionicons name="chevron-forward" size={18} color={colors.muted} />
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            {/* Sign out */}
-            <View className="px-4 mt-6 mb-10">
-                <TouchableOpacity
-                    onPress={handleSignout}
-                    className="flex-row items-center justify-center py-4 px-4 rounded-xl bg-red-50"
-                >
-                    <Ionicons name="log-out-outline" size={20} color={colors.error} />
-                    <Text className="text-base font-semibold ml-2" style={{ color: colors.error }}>
-                    Sign Out
+                    <Text className="text-xl font-bold text-white">
+                      {currentMember?.name?.charAt(0)?.toUpperCase() ?? '?'}
                     </Text>
-                </TouchableOpacity>
+                  </View>
+                )}
+              </View>
             </View>
+          </View>
         </View>
 
-      </ScrollView>
+        {/* Identity block */}
+        <View className="mt-12 items-center px-6 pb-2">
+          <Text className="text-[11px] font-bold tracking-[2px] text-muted">FAMILY</Text>
+          <Text className="mt-1 text-[26px] font-extrabold leading-tight text-foreground">
+            {family?.name ?? 'Your Family'}
+          </Text>
 
-      <UpgradePrompt
-        visible={upgradePromptVisible}
-        onClose={() => setUpgradePromptVisible(false)}
-        reason={upgradeReason}
-      />
-    </ScreenContainer>
-  );
+          <View className="mt-2 flex-row items-center gap-1.5 bg-primary rounded-full">
+            <TierBadge tier={family?.subscription_tier} />
+          </View>
+
+          {currentMember?.name && (
+            <Text className="mt-2 text-sm text-muted">
+              Signed in as {currentMember.name} · {currentMember.role}
+            </Text>
+          )}
+
+          <Pressable onPress={() => router.push('/(stack)/family-settings')} className="mt-3">
+            <Text className="text-sm font-semibold text-primary">Edit family name & photo</Text>
+          </Pressable>
+        </View>
+
+        {/* Upgrade CTA — free tier only, prominent placement right below identity */}
+        {!isPremium && (
+          <View className="mt-4 px-4">
+            <Pressable onPress={() => router.push('/(stack)/paywall')}>
+              <LinearGradient
+                colors={['#F59E0B', '#D97706']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={{
+                  borderRadius: 20,
+                  padding: 18,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  shadowColor: '#D97706',
+                  shadowOpacity: 0.3,
+                  shadowRadius: 12,
+                  shadowOffset: { width: 0, height: 6 },
+                  elevation: 4,
+                }}
+              >
+                <View className="h-11 w-11 items-center justify-center rounded-full bg-white/20">
+                  <Ionicons name="sparkles" size={20} color="#fff" />
+                </View>
+                <View className="ml-3 flex-1">
+                  <Text className="text-base font-bold text-white">Unlock Premium</Text>
+                  <Text className="mt-0.5 text-xs text-white/85">
+                    Full AI access, unlimited members & storage
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.85)" />
+              </LinearGradient>
+            </Pressable>
+          </View>
+        )}
+
+        {/* Account section */}
+        <View className="mt-7 px-4">
+          <Text className="mb-2 px-1 text-[11px] font-bold tracking-[1.5px] text-muted">ACCOUNT</Text>
+          <View
+            className="overflow-hidden rounded-2xl"
+            style={{
+              backgroundColor: colors.surface,
+              shadowColor: '#000',
+              shadowOpacity: 0.06,
+              shadowRadius: 8,
+              shadowOffset: { width: 0, height: 2 },
+              elevation: 1,
+            }}
+          >
+            {visibleItems.map((item, index) => (
+              <TouchableOpacity
+                key={item.route}
+                disabled={!item.open}
+                onPress={() => {
+                  if (!item.premium) openPremiumModal();
+                  else router.push(item.route as any);
+                }}
+                className={`flex-row items-center justify-between px-4 py-4 ${
+                  index !== visibleItems.length - 1 ? 'border-b' : ''
+                }`}
+                style={{ borderColor: colors.border }}
+              >
+                <View className="flex-row items-center">
+                  <View
+                    className="h-9 w-9 items-center justify-center rounded-full"
+                    style={{ backgroundColor: colors.primary + '1A' }}
+                  >
+                    <Ionicons name={item.icon} size={16} color={colors.primary} />
+                  </View>
+                  <Text className="ml-3 text-base text-foreground">{item.label}</Text>
+                </View>
+                <View className="flex-row items-center">
+                  {!item.premium && (
+                    <Ionicons name="lock-closed" size={10} color={colors.muted} style={{ marginRight: 4 }} />
+                  )}
+                  <Ionicons name="chevron-forward" size={16} color={colors.muted} />
+                </View>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
+        {/* Legal section */}
+        <View className="mt-6 px-4">
+          <Text className="mb-2 px-1 text-[11px] font-bold tracking-[1.5px] text-muted">LEGAL</Text>
+          <View
+            className="overflow-hidden rounded-2xl"
+            style={{
+              backgroundColor: colors.surface,
+              shadowColor: '#000',
+              shadowOpacity: 0.06,
+              shadowRadius: 8,
+              shadowOffset: { width: 0, height: 2 },
+              elevation: 1,
+            }}
+          >
+            {LEGAL_ITEMS.map((item, index) => (
+              <TouchableOpacity
+                key={item.route}
+                disabled={!item.open}
+                onPress={() => router.push(item.route as any)}
+                className={`flex-row items-center justify-between px-4 py-4 ${
+                  index !== LEGAL_ITEMS.length - 1 ? 'border-b' : ''
+                }`}
+                style={{ borderColor: colors.border }}
+              >
+                <View className="flex-row items-center">
+                  <View
+                    className="h-9 w-9 items-center justify-center rounded-full"
+                    style={{ backgroundColor: colors.muted + '1A' }}
+                  >
+                    <Ionicons name={item.icon} size={16} color={colors.muted} />
+                  </View>
+                  <Text className="ml-3 text-base text-foreground">{item.label}</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={16} color={colors.muted} />
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
+        {/* Sign out — neutral, not styled as a danger action */}
+        <View className="mt-7 px-4">
+          <TouchableOpacity
+            onPress={handleSignout}
+            className="flex-row items-center justify-center rounded-2xl py-4"
+            style={{ backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }}
+          >
+            <Ionicons name="log-out-outline" size={18} color={colors.foreground} />
+            <Text className="ml-2 text-base font-semibold text-foreground">Sign Out</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Delete account — the only red action on this screen */}
+        <View className="mt-3 px-4 mb-10">
+          <Pressable onPress={() => setShowDeleteModal(true)} className="items-center justify-center py-3">
+            <Text className="text-sm font-semibold text-red-500">Delete Account</Text>
+          </Pressable>
+        </View>
+      </View>
+    </ScrollView>
+
+    <UpgradePrompt visible={upgradePromptVisible} onClose={() => setUpgradePromptVisible(false)} reason={upgradeReason} />
+
+    <DeleteAccountModal
+      visible={showDeleteModal}
+      onClose={() => setShowDeleteModal(false)}
+      isFoundingAdmin={currentMember?.is_founding_admin ?? false}
+    />
+  </ScreenContainer>
+);
 }

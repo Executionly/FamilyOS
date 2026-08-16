@@ -15,6 +15,7 @@ interface RevenueCatEvent {
   app_user_id: string;
   original_app_user_id?: string;
   expiration_at_ms?: number | null;
+  transaction_id?: string;
   purchased_at_ms?: number | null;
   event_timestamp_ms?: number;
   store?: string;
@@ -105,6 +106,7 @@ serve(async (req) => {
       id: eventId,
       type: eventType,
       app_user_id: familyId,
+      transaction_id,
       expiration_at_ms,
       store,
       product_id,
@@ -219,6 +221,7 @@ serve(async (req) => {
             subscription_expires_at: expiresAt,
             subscription_platform: platform,
             revenuecat_customer_id: familyId,
+            revenuecat_store_transaction_id: transaction_id ?? null,
           })
           .eq('id', familyId);
 

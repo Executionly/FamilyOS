@@ -215,7 +215,7 @@ export default function MembersScreen() {
                 </View>
 
                 <View className="flex-row items-center gap-2 flex-wrap mt-2">
-                  {item.role === 'member' && isAdmin && (
+                  {item.role === 'member' && isAdmin &&  isClaimed &&(
                     <Pressable
                       onPress={(e) => {
                         e.stopPropagation();
@@ -228,7 +228,7 @@ export default function MembersScreen() {
                     </Pressable>
                   )}
 
-                  {item.role === 'admin' && !item.is_founding_admin && isAdmin && (
+                  {item.role === 'admin' && !item.is_founding_admin && isAdmin && isClaimed && (
                     <Pressable
                       onPress={(e) => {
                         e.stopPropagation();

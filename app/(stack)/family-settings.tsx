@@ -135,7 +135,7 @@ export default function FamilySettingsScreen() {
         
       </ScrollView>
       <View className='px-6'
-       style={{ paddingBottom: Math.max(insets.bottom, 12) }}>
+       style={{ paddingBottom: Math.max(insets.bottom, 13) }}>
         <Pressable
           onPress={handleSaveName}
           disabled={loading}

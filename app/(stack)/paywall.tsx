@@ -155,7 +155,8 @@ export default function PaywallScreen() {
 
   return (
     <ScreenContainer containerClassName="bg-background" safeAreaClassName="bg-background">
-      <ScrollView contentContainerStyle={{ padding: 24, paddingBottom: 40 }}>
+      <ScrollView 
+      contentContainerStyle={{ padding: 24, paddingBottom: 40 }}>
         <Pressable 
         onPress={handleNavigateBack} 
         className="mb-4 self-end">
@@ -250,7 +251,8 @@ export default function PaywallScreen() {
           )}
         </Pressable>
 
-        <Pressable onPress={handleRestore} disabled={purchasing || Platform.OS === "ios"} className="mt-4 items-center">
+        <Pressable onPress={handleRestore} disabled={purchasing || Platform.OS === "ios"} 
+        className="mt-4 items-center mb-4">
           <Text className="text-xs font-semibold text-muted">Restore Purchases</Text>
         </Pressable>
       </ScrollView>
