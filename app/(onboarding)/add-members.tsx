@@ -290,7 +290,7 @@ export default function AddMembersScreen() {
   const handleAddMember = () => {
     setError(null);
     if (atLimit) {
-      setError('You can add up to 4 family members on your current plan.');
+      setError(`You can add up to ${memberLimit} family members on your current plan.`);
       return;
     }
     if (!name?.trim()) {

@@ -34,7 +34,7 @@ const COPY: Record<UpgradePromptProps['reason'], { title: string; body: string }
   },
   member_limit: {
     title: "You've reached your member limit",
-    body: 'Free accounts can have up to 4 family members. Upgrade to Premium to add more.',
+    body: 'Free accounts can have up to 6 family members. Upgrade to Premium to add more.',
   },
   module_limit: {
     title: "You can't access this feature",

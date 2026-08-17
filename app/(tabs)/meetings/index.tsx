@@ -183,6 +183,7 @@ export default function MeetingsScreen() {
                           <Text className="ml-1.5 text-xs font-bold text-white">Join Meeting</Text>
                         </Pressable>
                       )}
+                      {item.status !== 'completed' && item.status !== 'cancelled' && 
                       <Pressable
                         onPress={(e) => {
                           e.stopPropagation();
@@ -192,7 +193,7 @@ export default function MeetingsScreen() {
                       >
                         <Ionicons name="pencil-outline" size={13} color={colors.foreground} />
                         <Text className="ml-1.5 text-xs font-semibold text-foreground">Edit</Text>
-                      </Pressable>
+                      </Pressable>}
                     </View>
                   </Pressable>
                 )}

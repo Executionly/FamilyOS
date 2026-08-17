@@ -10,6 +10,7 @@ import { useCommitmentStore } from '@/lib/stores/commitment-store';
 import { generateMeetingSummary } from '@/lib/services/meeting-ai';
 import { AppHeader } from '@/components/app-header';
 import { UpgradePrompt } from '@/components/upgrade-prompt';
+import { Ionicons } from '@expo/vector-icons';
 
 export default function RunMeetingScreen() {
   const router = useRouter();
@@ -268,7 +269,16 @@ export default function RunMeetingScreen() {
         )}
  
         {/* Navigation */}
-        <View style={{ flexDirection: 'row', gap: 12, marginTop: 8 }}>
+        {isLastItem && family?.subscription_tier !== 'premium' && (
+            <View className="mb-6 flex-row items-start gap-2 rounded-xl bg-primary/5 p-3">
+              <Ionicons name="sparkles" size={14} color={colors.primary} style={{ marginTop: 1 }} />
+              <Text className="flex-1 text-xs leading-5 text-muted">
+                Free plan includes one AI-generated agenda and one AI meeting summary. Upgrade to Premium for
+                unlimited agendas and summaries.
+              </Text>
+            </View>
+          )}
+        <View style={{ flexDirection: 'row', gap: 12, marginTop: 5 }}>
           {currentItemIndex > 0 && (
             <Pressable
               onPress={() => setCurrentItemIndex(currentItemIndex - 1)}

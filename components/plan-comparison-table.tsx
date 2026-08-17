@@ -37,7 +37,7 @@ export function PlanComparisonTable({
       premium: annualPriceString ? `${annualPriceString}/year` : '—',
       emphasize: true,
     },
-    { label: 'Family members', free: '6 Maximum', premium: 'Unlimited' },
+    { label: 'Family members', free: 'Maximum 6', premium: 'Unlimited' },
     { label: 'Storage', free: '200 MB', premium: 'Unlimited*', emphasize: true },
     { label: 'Family AI', free: 'Limited', premium: 'Expanded' },
     { label: 'Family Chat', free: true, premium: true },

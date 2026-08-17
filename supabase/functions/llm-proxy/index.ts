@@ -8,18 +8,19 @@ const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPAB
 
 interface LlmProxyRequest {
   family_id: string;
+  feature?: string;
   payload: Record<string, unknown>; // the fully-normalized DeepSeek payload, built client-side
 }
 
 serve(async (req) => {
   try {
-    const { family_id, payload }: LlmProxyRequest = await req.json();
+    const { family_id, feature, payload }: LlmProxyRequest = await req.json();
 
     if (!family_id || !payload?.messages) {
       return new Response(JSON.stringify({ error: 'Missing required fields' }), { status: 400 });
     }
 
-    const entitlement = await checkAiEntitlement(supabase, family_id);
+    const entitlement = await checkAiEntitlement(supabase, family_id, feature);
     if (!entitlement.allowed) {
       return new Response(JSON.stringify({
         error: entitlement.reason,
@@ -43,7 +44,7 @@ serve(async (req) => {
     }
 
     const data = await deepseekRes.json();
-    await recordAiUsage(supabase, family_id, entitlement.isIntro);
+    await recordAiUsage(supabase, family_id, entitlement.isIntro,entitlement.featureTrial);
 
     return new Response(JSON.stringify(data), { status: 200, headers: { 'Content-Type': 'application/json' } });
   } catch (err) {

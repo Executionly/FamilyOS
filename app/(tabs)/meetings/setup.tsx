@@ -9,6 +9,7 @@ import { useMeetingStore } from '@/lib/stores/meeting-store';
 import { generateMeetingAgenda } from '@/lib/services/meeting-ai';
 import { AppHeader } from '@/components/app-header';
 import { UpgradePrompt } from '@/components/upgrade-prompt';
+import { Ionicons } from '@expo/vector-icons';
 
 export default function MeetingSetupScreen() {
   const router = useRouter();
@@ -274,6 +275,16 @@ export default function MeetingSetupScreen() {
             />
           </View>
 
+          {family?.subscription_tier !== 'premium' && (
+            <View className="mb-6 flex-row items-start gap-2 rounded-xl bg-primary/5 p-3">
+              <Ionicons name="sparkles" size={14} color={colors.primary} style={{ marginTop: 1 }} />
+              <Text className="flex-1 text-xs leading-5 text-muted">
+                Free plan includes one AI-generated agenda and one AI meeting summary. Upgrade to Premium for
+                unlimited agendas and summaries.
+              </Text>
+            </View>
+          )}          
+
           {/* Generate Agenda Button */}
           <Pressable
             onPress={handleGenerateAgenda}
@@ -283,6 +294,7 @@ export default function MeetingSetupScreen() {
           >
             <Text className="text-white font-semibold text-lg">Generate AI Agenda</Text>
           </Pressable>
+          
         </View>
       </ScrollView>
       <UpgradePrompt

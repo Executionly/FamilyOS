@@ -44,6 +44,7 @@ export async function generateMeetingAgenda(
   try {
     response = await invokeLLM({
       familyId,
+      feature: 'meeting_agenda',
       model: 'deepseek-chat',
       maxTokens: 1500,
       responseFormat: { type: 'json_object' },
@@ -127,6 +128,7 @@ export async function generateMeetingSummary(
   try {
     response = await invokeLLM({
       familyId,
+      feature: 'meeting_summary',
       model: 'deepseek-chat',
       maxTokens: 1000,
       responseFormat: { type: 'json_object' },

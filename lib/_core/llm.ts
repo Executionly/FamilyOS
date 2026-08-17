@@ -45,6 +45,7 @@ export type InvokeParams = {
   tool_choice?: ToolChoice;
   maxTokens?: number;
   max_tokens?: number;
+  feature?: string;
   outputSchema?: OutputSchema;
   output_schema?: OutputSchema;
   responseFormat?: ResponseFormat;
@@ -172,6 +173,7 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     familyId, messages, tools, toolChoice, tool_choice,
     outputSchema, output_schema, responseFormat, response_format,
     model, thinking, reasoning, maxTokens, max_tokens,
+    feature
   } = params;
 
   if (!familyId) {
@@ -201,7 +203,7 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
 
   for (let attempt = 0; attempt <= RETRY_MAX_RETRIES; attempt++) {
     const { data, error } = await supabase.functions.invoke('llm-proxy', {
-      body: { family_id: familyId, payload },
+      body: { family_id: familyId, feature, payload },
     });
 
     if (!error) return data as InvokeResult;

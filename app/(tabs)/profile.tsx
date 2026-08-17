@@ -50,8 +50,6 @@ export default function ProfileScreen() {
     // { icon: 'person-outline', label: 'Account Settings', route: '/(stack)/paywall',open: true  },
   ];
 
-  const visibleItems = MENU_ITEMS.filter((item) => !item.premium || isAdmin);
-
   const handleSignout = () => {
     signOut()
     router.replace('/sign-in')
@@ -209,7 +207,7 @@ return (
               elevation: 1,
             }}
           >
-            {visibleItems.map((item, index) => (
+            {MENU_ITEMS.map((item, index) => (
               <TouchableOpacity
                 key={item.route}
                 disabled={!item.open}
@@ -218,7 +216,7 @@ return (
                   else router.push(item.route as any);
                 }}
                 className={`flex-row items-center justify-between px-4 py-4 ${
-                  index !== visibleItems.length - 1 ? 'border-b' : ''
+                  index !== MENU_ITEMS.length - 1 ? 'border-b' : ''
                 }`}
                 style={{ borderColor: colors.border }}
               >
