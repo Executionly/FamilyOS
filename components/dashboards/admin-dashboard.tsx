@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ScrollView, Text, View, Pressable,
   FlatList, ActivityIndicator,
@@ -19,6 +19,10 @@ import { FamilyChatFab } from '@/components/family-chat-fab';
 import { useNotificationStore } from '@/lib/stores/notification-store';
 import { Dimensions } from 'react-native';
 import { TierBadge } from '../ui/tier-badge';
+import { CoachmarkProvider, useCoachmark } from '@/lib/coachmark/coachmark-context';
+import { supabase } from '@/lib/_core/supabase';
+import { CoachmarkOverlay } from '../coachmark/coachmark-overlay';
+import { CoachmarkTarget } from '../coachmark/coachmark-target';
 
 // ── Brand palette ────────────────────────────────────────────
 const NAVY = '#044768';
@@ -158,12 +162,27 @@ function SectionHeader({ title, action, onAction }: { title: string; action?: st
   );
 }
 
+export function DashboardTourStarter({ hasSeenGuide }: { hasSeenGuide: boolean }) {
+  const { startTour } = useCoachmark();
+  useEffect(() => {
+    if (!hasSeenGuide) {
+      const timer = setTimeout(startTour, 400);
+      return () => clearTimeout(timer);
+    }
+  }, [hasSeenGuide]);
+  return null;
+}
+
 // ── Main screen ───────────────────────────────────────────────
 
 export default function AdminDashboard() {
   const router = useRouter();
+  const scrollViewRef = useRef<ScrollView>(null);
+  const scrollOffsetRef = useRef(0);
+  const scrollContainerRef = useRef<View>(null);
+  const scrollContainerYRef = useRef(0);
   const colors = useColors();
-  const { family, members } = useFamilyStore();
+  const { family, members,currentMember,fetchFamilyForUser } = useFamilyStore();
   const { meetings, fetchMeetings } = useMeetingStore();
   const { commitments, fetchCommitments } = useCommitmentStore();
   const { events, fetchEvents } = useCalendarStore();
@@ -194,6 +213,16 @@ export default function AdminDashboard() {
   useEffect(() => {
     handleFetch();
   }, [family?.id]);
+
+  const handleTourFinish = async () => {
+    if (!currentMember?.id) return;
+    await supabase
+      .from('member')
+      .update({ dashboard_guide_seen_at: new Date().toISOString() })
+      .eq('id', currentMember.id);
+      if(currentMember?.user_id)
+      await fetchFamilyForUser(currentMember?.user_id)
+  };
 
   // ── derived data ─────────────────────────────────────────────
 
@@ -246,403 +275,443 @@ export default function AdminDashboard() {
   }
 
   return (
-    <ScreenContainer containerClassName="bg-background" safeAreaClassName="bg-background">
-      <ScrollView
-        contentContainerStyle={{ paddingBottom: 40 }}
-        showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={loading} onRefresh={handleFetch} tintColor={NAVY} />}
-      >
-        {/* ── Header ─────────────────────────────────────────── */}
-        <View style={{
-          backgroundColor: NAVY,
-          paddingHorizontal: 24,
-          paddingTop: 10,
-          paddingBottom: 32,
-        }}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-            <View style={{ flex: 1 }}>
-              <View className="flex-row items-center">
-                <Text className='mr-2 mt-2'
-                style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13, fontWeight: '500' }}>
-                  {now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+    <CoachmarkProvider 
+    onFinish={handleTourFinish} 
+    scrollViewRef={scrollViewRef}
+    scrollOffsetRef={scrollOffsetRef}
+    scrollContainerYRef={scrollContainerYRef}
+    >
+      <DashboardTourStarter hasSeenGuide={!!currentMember?.dashboard_guide_seen_at} />
+
+      <ScreenContainer containerClassName="bg-background" safeAreaClassName="bg-background">
+        <View
+          ref={scrollContainerRef}
+          style={{ flex: 1 }}
+          onLayout={() => {
+            scrollContainerRef.current?.measureInWindow((_x, y) => {
+              scrollContainerYRef.current = y;
+            });
+          }}
+        >
+
+        <ScrollView
+          ref={scrollViewRef}
+          onScroll={(e) => { scrollOffsetRef.current = e.nativeEvent.contentOffset.y; }}
+          scrollEventThrottle={16}
+          contentContainerStyle={{ paddingBottom: 40 }}
+          showsVerticalScrollIndicator={false}
+          refreshControl={<RefreshControl refreshing={loading} onRefresh={handleFetch} tintColor={NAVY} />}
+        >
+          {/* ── Header ─────────────────────────────────────────── */}
+          <View style={{
+            backgroundColor: NAVY,
+            paddingHorizontal: 24,
+            paddingTop: 10,
+            paddingBottom: 32,
+          }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <View style={{ flex: 1 }}>
+                <View className="flex-row items-center">
+                  <Text className='mr-2 mt-2'
+                  style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13, fontWeight: '500' }}>
+                    {now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+                  </Text>
+                  <TierBadge tier={family?.subscription_tier} />
+                </View>
+                <Text style={{ color: '#fff', fontSize: 26, fontWeight: '800', marginTop: 4, lineHeight: 32 }}>
+                  {greeting()},{'\n'}{family?.name} Family 👋
                 </Text>
-                <TierBadge tier={family?.subscription_tier} />
               </View>
-              <Text style={{ color: '#fff', fontSize: 26, fontWeight: '800', marginTop: 4, lineHeight: 32 }}>
-                {greeting()},{'\n'}{family?.name} Family 👋
-              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                <NotificationBell />
+              </View>
             </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
-              <NotificationBell />
-            </View>
-          </View>
 
-          {/* Next meeting pill */}
-          <View style={{
-            marginTop: 16,
-            backgroundColor: 'rgba(255,255,255,0.12)',
-            borderRadius: 12,
-            paddingHorizontal: 14,
-            paddingVertical: 10,
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-          }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <Ionicons name="calendar-outline" size={20} color="#fff" />
-              <Text style={{ color: '#fff', fontWeight: '600', fontSize: 13 }}>
-                {nextMeeting
-                  ? `Next meeting · ${new Date(nextMeeting.scheduled_date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}`
-                  : 'No meeting scheduled'}
-              </Text>
-            </View>
-            <Pressable
-              onPress={() => router.push('/meetings/setup')}
-              style={{ backgroundColor: CORAL, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 }}
-            >
-              <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700' }}>
-                {nextMeeting ? 'View' : 'Schedule'}
-              </Text>
-            </Pressable>
-          </View>
-        </View>
-
-        {/* ── Body ───────────────────────────────────────────── */}
-        <View style={{ paddingHorizontal: 20, marginTop: -12 }}>
-
-          {/* ── Progress rings card ─────────────────────────── */}
-          <View style={{
-            backgroundColor: CARD_BG,
-            borderRadius: 18,
-            padding: 20,
-            borderWidth: 1,
-            borderColor: BORDER,
-            marginBottom: 16,
-            shadowColor: NAVY,
-            shadowOpacity: 0.06,
-            shadowRadius: 10,
-            shadowOffset: { width: 0, height: 3 },
-            elevation: 2,
-          }}>
-            <SectionHeader title="Family Progress" />
-            <View style={{ flexDirection: 'row', justifyContent: 'space-around', paddingTop: 8 }}>
-              <View style={{ alignItems: 'center', gap: 6 }}>
-                <ProgressRing
-                  progress={followThrough}
-                  color={NAVY}
-                  bg={NAVY_SOFT}
-                  label={`${Math.round(followThrough * 100)}%`}
-                  sublabel="done"
-                />
-                <Text style={{ fontSize: 11, color: MUTED, fontWeight: '600' }}>Commitments</Text>
-              </View>
-              <View style={{ alignItems: 'center', gap: 6 }}>
-                <ProgressRing
-                  progress={choreRate}
-                  color={CORAL}
-                  bg={CORAL_SOFT}
-                  label={`${Math.round(choreRate * 100)}%`}
-                  sublabel="done"
-                />
-                <Text style={{ fontSize: 11, color: MUTED, fontWeight: '600' }}>Chores</Text>
-              </View>
-              <View style={{ alignItems: 'center', gap: 6 }}>
-                <ProgressRing
-                  progress={meetings.filter((m) => m.status === 'completed').length > 0 ? 1 : 0}
-                  color={NAVY}
-                  bg={NAVY_SOFT}
-                  label={`${meetings.filter((m) => m.status === 'completed').length}`}
-                  sublabel="total"
-                />
-                <Text style={{ fontSize: 11, color: MUTED, fontWeight: '600' }}>Meetings</Text>
-              </View>
-            </View>
-          </View>
-          {/* ── Premium upsell (only shown on free plan) ──────── */}
-          {!isPremium && (
-            <Pressable
-              onPress={() => router.push('/(stack)/paywall')}
-              style={{
-                backgroundColor: NAVY,
-                borderRadius: 18,
-                padding: 18,
-                marginBottom: 16,
+            {/* Next meeting pill */}
+            <CoachmarkTarget id="next-meeting" order={1} title="Stay on top of meetings" description="See your next scheduled family meeting at a glance, or start one right from here.">
+              <View style={{
+                marginTop: 16,
+                backgroundColor: 'rgba(255,255,255,0.12)',
+                borderRadius: 12,
+                paddingHorizontal: 14,
+                paddingVertical: 10,
                 flexDirection: 'row',
                 alignItems: 'center',
-                gap: 14,
-              }}
-            >
-              <View style={{
-                width: 42, height: 42, borderRadius: 12, backgroundColor: CORAL,
-                alignItems: 'center', justifyContent: 'center',
+                justifyContent: 'space-between',
               }}>
-                <Ionicons name="sparkles" size={20} color="#fff" />
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Ionicons name="calendar-outline" size={20} color="#fff" />
+                  <Text style={{ color: '#fff', fontWeight: '600', fontSize: 13 }}>
+                    {nextMeeting
+                      ? `Next meeting · ${new Date(nextMeeting.scheduled_date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}`
+                      : 'No meeting scheduled'}
+                  </Text>
+                </View>
+                <Pressable
+                  onPress={() => router.push('/meetings/setup')}
+                  style={{ backgroundColor: CORAL, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 }}
+                >
+                  <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700' }}>
+                    {nextMeeting ? 'View' : 'Schedule'}
+                  </Text>
+                </Pressable>
               </View>
-              <View style={{ flex: 1 }}>
-                <Text style={{ color: '#fff', fontSize: 14, fontWeight: '700' }}>Go Premium</Text>
-                <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12, marginTop: 2 }}>
-                  Unlock AI meeting agendas, unlimited members, and more.
+            </CoachmarkTarget>
+          </View>
+
+          {/* ── Body ───────────────────────────────────────────── */}
+          <View style={{ paddingHorizontal: 20, marginTop: -12 }}>
+
+            {/* ── Progress rings card ─────────────────────────── */}
+            <CoachmarkTarget id="progress" order={2} title="Family Progress" 
+            description="Track how your family is doing with commitments, chores, and meetings over time.">
+              <View style={{
+                backgroundColor: CARD_BG,
+                borderRadius: 18,
+                padding: 20,
+                borderWidth: 1,
+                borderColor: BORDER,
+                marginBottom: 16,
+                shadowColor: NAVY,
+                shadowOpacity: 0.06,
+                shadowRadius: 10,
+                shadowOffset: { width: 0, height: 3 },
+                elevation: 2,
+              }}>
+                <SectionHeader title="Family Progress" />
+                <View style={{ flexDirection: 'row', justifyContent: 'space-around', paddingTop: 8 }}>
+                  <View style={{ alignItems: 'center', gap: 6 }}>
+                    <ProgressRing
+                      progress={followThrough}
+                      color={NAVY}
+                      bg={NAVY_SOFT}
+                      label={`${Math.round(followThrough * 100)}%`}
+                      sublabel="done"
+                    />
+                    <Text style={{ fontSize: 11, color: MUTED, fontWeight: '600' }}>Commitments</Text>
+                  </View>
+                  <View style={{ alignItems: 'center', gap: 6 }}>
+                    <ProgressRing
+                      progress={choreRate}
+                      color={CORAL}
+                      bg={CORAL_SOFT}
+                      label={`${Math.round(choreRate * 100)}%`}
+                      sublabel="done"
+                    />
+                    <Text style={{ fontSize: 11, color: MUTED, fontWeight: '600' }}>Chores</Text>
+                  </View>
+                  <View style={{ alignItems: 'center', gap: 6 }}>
+                    <ProgressRing
+                      progress={meetings.filter((m) => m.status === 'completed').length > 0 ? 1 : 0}
+                      color={NAVY}
+                      bg={NAVY_SOFT}
+                      label={`${meetings.filter((m) => m.status === 'completed').length}`}
+                      sublabel="total"
+                    />
+                    <Text style={{ fontSize: 11, color: MUTED, fontWeight: '600' }}>Meetings</Text>
+                  </View>
+                </View>
+              </View>
+            </CoachmarkTarget>
+            {/* ── Premium upsell (only shown on free plan) ──────── */}
+            {!isPremium && (
+              <CoachmarkTarget id="premium-upsell" order={3} title="Unlock more with Premium" description="Get AI meeting agendas, unlimited members, and more whenever you're ready.">
+                <Pressable
+                  onPress={() => router.push('/(stack)/paywall')}
+                  style={{
+                    backgroundColor: NAVY,
+                    borderRadius: 18,
+                    padding: 18,
+                    marginBottom: 16,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 14,
+                  }}
+                >
+                  <View style={{
+                    width: 42, height: 42, borderRadius: 12, backgroundColor: CORAL,
+                    alignItems: 'center', justifyContent: 'center',
+                  }}>
+                    <Ionicons name="sparkles" size={20} color="#fff" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: '#fff', fontSize: 14, fontWeight: '700' }}>Go Premium</Text>
+                    <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12, marginTop: 2 }}>
+                      Unlock AI meeting agendas, unlimited members, and more.
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={18} color="#fff" />
+                </Pressable>
+              </CoachmarkTarget>
+            )}
+            {/* ── Stat cards row ──────────────────────────────── */}
+            <CoachmarkTarget id="stats" order={4} title="Your daily snapshot" description="Open tasks, today's events, and chores due — everything that needs attention today.">
+              <View style={{ flexDirection: 'row', gap: 10, marginBottom: 16 }}>
+                <StatCard
+                  icon={(props) => <Ionicons name="checkmark-circle-outline" {...props} />}
+                  label="Open Tasks"
+                  value={openCommitments.length}
+                  sub={openCommitments.length === 0 ? 'All caught up!' : 'need attention'}
+                  accent={NAVY}
+                  accentBg={NAVY_SOFT}
+                />
+                <StatCard
+                  icon={(props) => <Ionicons name="calendar-clear-outline" {...props} />}
+                  label="Today's Events"
+                  value={todayEvents.length}
+                  sub={todayEvents.length === 0 ? 'Nothing today' : undefined}
+                  accent={CORAL}
+                  accentBg={CORAL_SOFT}
+                />
+                <StatCard
+                  icon={(props) => <Ionicons name="construct-outline" {...props} />}
+                  label="Chores Due"
+                  value={todayChores.length}
+                  sub={todayChores.length === 0 ? 'All clear' : 'today'}
+                  accent={NAVY}
+                  accentBg={NAVY_SOFT}
+                />
+              </View>
+            </CoachmarkTarget>
+
+            {/* ── 7-day activity chart ─────────────────────────── */}
+            <CoachmarkTarget id="activity" order={5} title="See your trends" description="Track how often your family holds meetings throughout the week.">
+              <View style={{
+                backgroundColor: CARD_BG,
+                borderRadius: 18,
+                padding: 20,
+                borderWidth: 1,
+                borderColor: BORDER,
+                marginBottom: 16,
+                shadowColor: NAVY,
+                shadowOpacity: 0.06,
+                shadowRadius: 10,
+                shadowOffset: { width: 0, height: 3 },
+                elevation: 2,
+              }}>
+                <SectionHeader title="7-Day Meeting Activity" />
+                <View style={{ alignItems: 'center', paddingTop: 4 }}>
+                  <ActivityBars data={weekBars} color={CORAL} />
+                </View>
+                <Text style={{ fontSize: 11, color: MUTED, textAlign: 'center', marginTop: 8 }}>
+                  Meetings held per day this week
                 </Text>
               </View>
-              <Ionicons name="chevron-forward" size={18} color="#fff" />
-            </Pressable>
-          )}
-          {/* ── Stat cards row ──────────────────────────────── */}
-          <View style={{ flexDirection: 'row', gap: 10, marginBottom: 16 }}>
-            <StatCard
-              icon={(props) => <Ionicons name="checkmark-circle-outline" {...props} />}
-              label="Open Tasks"
-              value={openCommitments.length}
-              sub={openCommitments.length === 0 ? 'All caught up!' : 'need attention'}
-              accent={NAVY}
-              accentBg={NAVY_SOFT}
-            />
-            <StatCard
-              icon={(props) => <Ionicons name="calendar-clear-outline" {...props} />}
-              label="Today's Events"
-              value={todayEvents.length}
-              sub={todayEvents.length === 0 ? 'Nothing today' : undefined}
-              accent={CORAL}
-              accentBg={CORAL_SOFT}
-            />
-            <StatCard
-              icon={(props) => <Ionicons name="construct-outline" {...props} />}
-              label="Chores Due"
-              value={todayChores.length}
-              sub={todayChores.length === 0 ? 'All clear' : 'today'}
-              accent={NAVY}
-              accentBg={NAVY_SOFT}
-            />
-          </View>
+            </CoachmarkTarget>
 
-          {/* ── 7-day activity chart ─────────────────────────── */}
-          <View style={{
-            backgroundColor: CARD_BG,
-            borderRadius: 18,
-            padding: 20,
-            borderWidth: 1,
-            borderColor: BORDER,
-            marginBottom: 16,
-            shadowColor: NAVY,
-            shadowOpacity: 0.06,
-            shadowRadius: 10,
-            shadowOffset: { width: 0, height: 3 },
-            elevation: 2,
-          }}>
-            <SectionHeader title="7-Day Meeting Activity" />
-            <View style={{ alignItems: 'center', paddingTop: 4 }}>
-              <ActivityBars data={weekBars} color={CORAL} />
-            </View>
-            <Text style={{ fontSize: 11, color: MUTED, textAlign: 'center', marginTop: 8 }}>
-              Meetings held per day this week
-            </Text>
-          </View>
+            {/* ── Open Commitments ────────────────────────────── */}
+            {openCommitments.length > 0 && (
+              <View style={{ marginBottom: 16 }}>
+                <SectionHeader
+                  title="Open Commitments"
+                  action="View all"
+                  onAction={() => router.push('/(tabs)/meetings')}
+                />
+                <FlatList
+                  horizontal
+                  scrollEnabled
+                  showsHorizontalScrollIndicator={false}
+                  data={openCommitments.slice(0, 5)}
+                  keyExtractor={(_, i) => i?.toString()}
+                  renderItem={({ item }) => (
+                    <View style={{
+                      marginRight: 10,
+                      padding: 14,
+                      borderRadius: 14,
+                      borderWidth: 1,
+                      borderColor: BORDER,
+                      backgroundColor: CARD_BG,
+                      minWidth: 160,
+                      maxWidth: 200,
+                    }}>
+                      <View style={{
+                        width: 6, height: 6, borderRadius: 3,
+                        backgroundColor: CORAL, marginBottom: 8,
+                      }} />
+                      <Text style={{ fontSize: 13, fontWeight: '600', color: INK }} numberOfLines={2}>
+                        {item.title}
+                      </Text>
+                      {item.due_date && (
+                        <Text style={{ fontSize: 11, color: MUTED, marginTop: 6 }}>
+                          Due {new Date(item.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                        </Text>
+                      )}
+                      {item.priority && (
+                        <View style={{
+                          marginTop: 8,
+                          alignSelf: 'flex-start',
+                          paddingHorizontal: 8,
+                          paddingVertical: 2,
+                          borderRadius: 20,
+                          backgroundColor: item.priority === 'high' ? CORAL : item.priority === 'medium' ? CORAL_SOFT : NAVY_SOFT,
+                        }}>
+                          <Text style={{
+                            fontSize: 10, fontWeight: '700',
+                            color: item.priority === 'high' ? '#fff' : item.priority === 'medium' ? CORAL : NAVY,
+                            textTransform: 'capitalize',
+                          }}>
+                            {item.priority}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                  )}
+                />
+              </View>
+            )}
 
-          {/* ── Open Commitments ────────────────────────────── */}
-          {openCommitments.length > 0 && (
-            <View style={{ marginBottom: 16 }}>
-              <SectionHeader
-                title="Open Commitments"
-                action="View all"
-                onAction={() => router.push('/(tabs)/meetings')}
-              />
-              <FlatList
-                horizontal
-                scrollEnabled
-                showsHorizontalScrollIndicator={false}
-                data={openCommitments.slice(0, 5)}
-                keyExtractor={(_, i) => i?.toString()}
-                renderItem={({ item }) => (
-                  <View style={{
-                    marginRight: 10,
-                    padding: 14,
+            {/* ── Today's Events ──────────────────────────────── */}
+            {todayEvents.length > 0 && (
+              <View style={{ marginBottom: 16 }}>
+                <SectionHeader
+                  title="Today's Events"
+                  action="Calendar"
+                  onAction={() => router.push('/(stack)/calendar')}
+                />
+                {todayEvents.map((item, i) => (
+                  <View key={i} style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    backgroundColor: CARD_BG,
                     borderRadius: 14,
+                    padding: 14,
+                    marginBottom: 8,
                     borderWidth: 1,
                     borderColor: BORDER,
-                    backgroundColor: CARD_BG,
-                    minWidth: 160,
-                    maxWidth: 200,
                   }}>
                     <View style={{
-                      width: 6, height: 6, borderRadius: 3,
-                      backgroundColor: CORAL, marginBottom: 8,
+                      width: 4, height: 40, borderRadius: 2,
+                      backgroundColor: NAVY,
+                      marginRight: 12,
                     }} />
-                    <Text style={{ fontSize: 13, fontWeight: '600', color: INK }} numberOfLines={2}>
-                      {item.title}
-                    </Text>
-                    {item.due_date && (
-                      <Text style={{ fontSize: 11, color: MUTED, marginTop: 6 }}>
-                        Due {new Date(item.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                      </Text>
-                    )}
-                    {item.priority && (
-                      <View style={{
-                        marginTop: 8,
-                        alignSelf: 'flex-start',
-                        paddingHorizontal: 8,
-                        paddingVertical: 2,
-                        borderRadius: 20,
-                        backgroundColor: item.priority === 'high' ? CORAL : item.priority === 'medium' ? CORAL_SOFT : NAVY_SOFT,
-                      }}>
-                        <Text style={{
-                          fontSize: 10, fontWeight: '700',
-                          color: item.priority === 'high' ? '#fff' : item.priority === 'medium' ? CORAL : NAVY,
-                          textTransform: 'capitalize',
-                        }}>
-                          {item.priority}
-                        </Text>
-                      </View>
-                    )}
-                  </View>
-                )}
-              />
-            </View>
-          )}
-
-          {/* ── Today's Events ──────────────────────────────── */}
-          {todayEvents.length > 0 && (
-            <View style={{ marginBottom: 16 }}>
-              <SectionHeader
-                title="Today's Events"
-                action="Calendar"
-                onAction={() => router.push('/(stack)/calendar')}
-              />
-              {todayEvents.map((item, i) => (
-                <View key={i} style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  backgroundColor: CARD_BG,
-                  borderRadius: 14,
-                  padding: 14,
-                  marginBottom: 8,
-                  borderWidth: 1,
-                  borderColor: BORDER,
-                }}>
-                  <View style={{
-                    width: 4, height: 40, borderRadius: 2,
-                    backgroundColor: NAVY,
-                    marginRight: 12,
-                  }} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 14, fontWeight: '600', color: INK }}>{item.title}</Text>
-                    <Text style={{ fontSize: 12, color: MUTED, marginTop: 2 }}>
-                      {new Date(item.start_date).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
-                      {item.location ? ` · ${item.location}` : ''}
-                    </Text>
-                  </View>
-                  <Ionicons name="calendar" size={18} color={NAVY} />
-                </View>
-              ))}
-            </View>
-          )}
-
-          {/* ── Chores Due Today ────────────────────────────── */}
-          {todayChores.length > 0 && (
-            <View style={{ marginBottom: 16 }}>
-              <SectionHeader
-                title="Chores Due Today"
-                action="View all"
-                onAction={() => router.push('/(stack)/create-chore')}
-              />
-              {todayChores.map((item, i) => (
-                <View key={i} style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  backgroundColor: CARD_BG,
-                  borderRadius: 14,
-                  padding: 14,
-                  marginBottom: 8,
-                  borderWidth: 1,
-                  borderColor: BORDER,
-                }}>
-                  <View style={{
-                    width: 34, height: 34, borderRadius: 10, backgroundColor: CORAL_SOFT,
-                    alignItems: 'center', justifyContent: 'center', marginRight: 12,
-                  }}>
-                    <Ionicons name="construct-outline" size={17} color={CORAL} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 14, fontWeight: '600', color: INK }}>{item.title}</Text>
-                    {item.assigned_to && (
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 14, fontWeight: '600', color: INK }}>{item.title}</Text>
                       <Text style={{ fontSize: 12, color: MUTED, marginTop: 2 }}>
-                        Assigned to {memberName(item.assigned_to)}
+                        {new Date(item.start_date).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                        {item.location ? ` · ${item.location}` : ''}
                       </Text>
-                    )}
+                    </View>
+                    <Ionicons name="calendar" size={18} color={NAVY} />
                   </View>
-                  <Pressable
-                    onPress={() => handleMarkChoreComplete(item.id)}
-                    style={({ pressed }) => ({
-                      backgroundColor: pressed ? NAVY : CORAL,
-                      borderRadius: 8,
-                      paddingHorizontal: 14,
-                      paddingVertical: 7,
-                    })}
-                  >
-                    <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>Done ✓</Text>
-                  </Pressable>
-                </View>
-              ))}
-            </View>
-          )}
-
-          {/* ── Empty state when everything is clear ────────── */}
-          {openCommitments.length === 0 && todayEvents.length === 0 && todayChores.length === 0 && (
-            <View style={{
-              backgroundColor: NAVY_SOFT,
-              borderRadius: 18,
-              padding: 24,
-              alignItems: 'center',
-              borderWidth: 1,
-              borderColor: BORDER,
-              marginBottom: 16,
-            }}>
-              <View style={{
-                width: 44, height: 44, borderRadius: 22, backgroundColor: CORAL_SOFT,
-                alignItems: 'center', justifyContent: 'center', marginBottom: 4,
-              }}>
-                <Ionicons name="sparkles-outline" size={22} color={CORAL} />
+                ))}
               </View>
-              <Text style={{ fontSize: 16, fontWeight: '700', color: NAVY, textAlign: 'center', marginTop: 6 }}>
-                All caught up!
-              </Text>
-              <Text style={{ fontSize: 13, color: MUTED, textAlign: 'center', marginTop: 4 }}>
-                No open tasks, events, or chores today.
-              </Text>
-            </View>
-          )}
+            )}
 
-        </View>
-        {/* ── Action Hub ─────────────────────────────────────── */}
-        <View style={{ paddingHorizontal: 24 }}>
-          <Text style={{ fontSize: 14, fontWeight: '800', color: INK, marginBottom: 16 }}>Action Hub</Text>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
-            {[
-              { label: 'Add Event', icon: 'add-circle', route: '/(stack)/create-event', color: NAVY, bg: NAVY_SOFT },
-              { label: 'New Chore', icon: 'construct', route: '/(stack)/create-chore', color: CORAL, bg: CORAL_SOFT },
-              { label: 'Start Meeting', icon: 'people', route: '/meetings/setup', color: NAVY, bg: NAVY_SOFT },
-              { label: 'Family Members', icon: 'eye', route: '/(stack)/member-list', color: MUTED, bg: '#F1F3F5' },
-            ].map((action, i) => (
-              <Pressable
-                key={i}
-                onPress={() => router.push(action.route as any)}
-                style={{
-                  width: (SCREEN_WIDTH - 60) / 2,
-                  backgroundColor: action.bg,
-                  borderRadius: 20,
-                  padding: 16,
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  gap: 12,
-                }}
-              >
-                <Ionicons name={action.icon as any} size={20} color={action.color} />
-                <Text style={{ fontSize: 13, fontWeight: '700', color: action.color }}>{action.label}</Text>
-              </Pressable>
-            ))}
+            {/* ── Chores Due Today ────────────────────────────── */}
+            {todayChores.length > 0 && (
+              <View style={{ marginBottom: 16 }}>
+                <SectionHeader
+                  title="Chores Due Today"
+                  action="View all"
+                  onAction={() => router.push('/(stack)/create-chore')}
+                />
+                {todayChores.map((item, i) => (
+                  <View key={i} style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    backgroundColor: CARD_BG,
+                    borderRadius: 14,
+                    padding: 14,
+                    marginBottom: 8,
+                    borderWidth: 1,
+                    borderColor: BORDER,
+                  }}>
+                    <View style={{
+                      width: 34, height: 34, borderRadius: 10, backgroundColor: CORAL_SOFT,
+                      alignItems: 'center', justifyContent: 'center', marginRight: 12,
+                    }}>
+                      <Ionicons name="construct-outline" size={17} color={CORAL} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 14, fontWeight: '600', color: INK }}>{item.title}</Text>
+                      {item.assigned_to && (
+                        <Text style={{ fontSize: 12, color: MUTED, marginTop: 2 }}>
+                          Assigned to {memberName(item.assigned_to)}
+                        </Text>
+                      )}
+                    </View>
+                    <Pressable
+                      onPress={() => handleMarkChoreComplete(item.id)}
+                      style={({ pressed }) => ({
+                        backgroundColor: pressed ? NAVY : CORAL,
+                        borderRadius: 8,
+                        paddingHorizontal: 14,
+                        paddingVertical: 7,
+                      })}
+                    >
+                      <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>Done ✓</Text>
+                    </Pressable>
+                  </View>
+                ))}
+              </View>
+            )}
+
+            {/* ── Empty state when everything is clear ────────── */}
+            {openCommitments.length === 0 && todayEvents.length === 0 && todayChores.length === 0 && (
+              <View style={{
+                backgroundColor: NAVY_SOFT,
+                borderRadius: 18,
+                padding: 24,
+                alignItems: 'center',
+                borderWidth: 1,
+                borderColor: BORDER,
+                marginBottom: 16,
+              }}>
+                <View style={{
+                  width: 44, height: 44, borderRadius: 22, backgroundColor: CORAL_SOFT,
+                  alignItems: 'center', justifyContent: 'center', marginBottom: 4,
+                }}>
+                  <Ionicons name="sparkles-outline" size={22} color={CORAL} />
+                </View>
+                <Text style={{ fontSize: 16, fontWeight: '700', color: NAVY, textAlign: 'center', marginTop: 6 }}>
+                  All caught up!
+                </Text>
+                <Text style={{ fontSize: 13, color: MUTED, textAlign: 'center', marginTop: 4 }}>
+                  No open tasks, events, or chores today.
+                </Text>
+              </View>
+            )}
+
           </View>
-        </View>
-      </ScrollView>
-      <FamilyChatFab />
-    </ScreenContainer>
+          {/* ── Action Hub ─────────────────────────────────────── */}
+          <CoachmarkTarget id="action-hub" order={6} title="Quick actions" description="Add an event, log a chore, or start a meeting in one tap.">
+            <View style={{ paddingHorizontal: 24 }}>
+              <Text style={{ fontSize: 14, fontWeight: '800', color: INK, marginBottom: 16 }}>Action Hub</Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+                {[
+                  { label: 'Add Event', icon: 'add-circle', route: '/(stack)/create-event', color: NAVY, bg: NAVY_SOFT },
+                  { label: 'New Chore', icon: 'construct', route: '/(stack)/create-chore', color: CORAL, bg: CORAL_SOFT },
+                  { label: 'Start Meeting', icon: 'people', route: '/meetings/setup', color: NAVY, bg: NAVY_SOFT },
+                  { label: 'Family Members', icon: 'eye', route: '/(stack)/member-list', color: MUTED, bg: '#F1F3F5' },
+                ].map((action, i) => (
+                  <Pressable
+                    key={i}
+                    onPress={() => router.push(action.route as any)}
+                    style={{
+                      width: (SCREEN_WIDTH - 60) / 2,
+                      backgroundColor: action.bg,
+                      borderRadius: 20,
+                      padding: 16,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 12,
+                    }}
+                  >
+                    <Ionicons name={action.icon as any} size={20} color={action.color} />
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: action.color }}>{action.label}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+          </CoachmarkTarget>
+        </ScrollView>
+      </View>
+        <CoachmarkTarget id="chat-fab" order={7} title="Ask your Family AI" description="Have a question about the app or your family? Just ask — it's always one tap away.">
+          <FamilyChatFab />
+        </CoachmarkTarget>
+      </ScreenContainer>
+
+      <CoachmarkOverlay />
+    </CoachmarkProvider>
   );
 }

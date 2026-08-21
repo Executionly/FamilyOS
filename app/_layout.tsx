@@ -40,7 +40,7 @@ export default function RootLayout() {
             <ThemeProvider>
               <StatusBar style='dark'/>
               <ToastHost />
-              <BriefingModal />
+              {/* <BriefingModal /> */}
                 <Stack
                   screenOptions={{
                     headerShown: false,

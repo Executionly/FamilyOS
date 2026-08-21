@@ -47,6 +47,13 @@ export default function ProfileScreen() {
     { icon: 'calendar-outline', label: 'Calendar (School schedules, Travel plans...) ', route: '/(stack)/calendar', open: true, premium: true },
     { icon: 'images-outline', label: 'Family Media', route: '/(stack)/media-library', open: true, premium: true },
     { icon: 'person-outline', label: 'Account Settings', route: '/(stack)/account-settings',open: true, premium: true },
+    {
+      label: 'Guide',
+      icon: 'book-outline',
+      route: '/(stack)/guide',
+      premium: true, // available to everyone, not gated
+      open: true,
+    }
     // { icon: 'person-outline', label: 'Account Settings', route: '/(stack)/paywall',open: true  },
   ];
 

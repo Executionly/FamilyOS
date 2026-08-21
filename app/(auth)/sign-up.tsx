@@ -90,7 +90,7 @@ export default function SignUpScreen() {
           showsVerticalScrollIndicator={false}
           className="flex-1"
         >
-          <View className="flex-1 justify-center px-6 py-8">
+          <View className="flex-1 justify-center px-6 py-8 mb-5">
             {/* Header */}
             <View className="mb-8 items-center">
               <Text className="text-4xl font-bold text-foreground mb-2">Create Account</Text>
@@ -335,7 +335,7 @@ export default function SignUpScreen() {
 
             {/* Sign In Link */}
             <View className="flex-row justify-center items-center"
-            style={{ paddingBottom: Math.max(insets.bottom, 12) }}>
+            style={{ paddingBottom: Math.max(insets.bottom, 14) }}>
               <Text className="text-sm text-muted">Already have an account? </Text>
               <Link href="/(auth)/sign-in" asChild>
                 <Pressable>
