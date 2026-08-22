@@ -16,6 +16,7 @@ type MenuItem = {
   icon: keyof typeof Ionicons.glyphMap;
   label: string;
   route: string;
+  description?: string;
   premium?: boolean;
   open: boolean;
 };
@@ -41,20 +42,20 @@ export default function ProfileScreen() {
   const isAdmin = isAdminAccess(currentMember?.role)
 
   const MENU_ITEMS: MenuItem[] = [
-    { icon: 'people-outline', label: 'Family Members', route: '/(stack)/member-list', open: true, premium: true },
-    { icon: 'restaurant-outline', label: 'Meal Planner', route: '/(stack)/meal',open: true, premium: isPremium },
-    { icon: 'construct-outline', label: 'Manage Chores', route: '/(stack)/chores',open: true,premium: true },
-    { icon: 'calendar-outline', label: 'Calendar (School schedules, Travel plans...) ', route: '/(stack)/calendar', open: true, premium: true },
-    { icon: 'images-outline', label: 'Family Media', route: '/(stack)/media-library', open: true, premium: true },
-    { icon: 'person-outline', label: 'Account Settings', route: '/(stack)/account-settings',open: true, premium: true },
+    { icon: 'people-outline', label: 'Family Members', description: 'Add, invite, and manage everyone in your family', route: '/(stack)/member-list', open: true, premium: true },
+    { icon: 'restaurant-outline', label: 'Meal Planner', description: "Plan meals and build your family's weekly menu", route: '/(stack)/meal', open: true, premium: isPremium },
+    { icon: 'construct-outline', label: 'Manage Chores', description: "Assign chores and track who's completed what", route: '/(stack)/chores', open: true, premium: true },
+    { icon: 'calendar-outline', label: 'Calendar (School schedules, Travel plans...) ', description: 'School schedules, appointments, travel plans, birthdays & more', route: '/(stack)/calendar', open: true, premium: true },
+    { icon: 'images-outline', label: 'Family Media', description: "Store and browse your family's photos and videos", route: '/(stack)/media-library', open: true, premium: true },
+    { icon: 'person-outline', label: 'Account Settings', description: 'Manage your profile, subscription, and account', route: '/(stack)/account-settings', open: true, premium: true },
     {
       label: 'Guide',
       icon: 'book-outline',
+      description: 'Learn what you can do in the app and where to find it',
       route: '/(stack)/guide',
-      premium: true, // available to everyone, not gated
+      premium: true,
       open: true,
-    }
-    // { icon: 'person-outline', label: 'Account Settings', route: '/(stack)/paywall',open: true  },
+    },
   ];
 
   const handleSignout = () => {
@@ -234,7 +235,10 @@ return (
                   >
                     <Ionicons name={item.icon} size={16} color={colors.primary} />
                   </View>
-                  <Text className="ml-3 text-base text-foreground">{item.label}</Text>
+                  <View className="ml-3 flex-1">
+                    <Text className="text-base text-foreground">{item.label}</Text>
+                    <Text className="mt-0.5 text-xs text-muted">{item.description}</Text>
+                  </View>
                 </View>
                 <View className="flex-row items-center">
                   {!item.premium && (

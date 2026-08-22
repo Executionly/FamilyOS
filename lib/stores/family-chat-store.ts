@@ -100,34 +100,31 @@ export const useFamilyChatStore = create<FamilyChatState>((set, get) => ({
         created_at: new Date().toISOString(),
         user_id: userId,
     };
-    set((state) => ({ messages: [...state.messages, optimisticMessage] }));
-
-    const result = await invokeAiFunction('family-ai-chat', { family_id: familyId, user_id: userId, message });
-
-    if (result.upgradeReason) {
-      set((state) => ({
-        upgradeRequired: true,
-        upgradeReason: result.upgradeReason,
-        sending: false,
-        messages: state.messages.filter((m) => m.id !== optimisticMessage.id), // roll back — message wasn't actually sent
-      }));
-      return;
-    }
-
-    if (result.error) {
-      set((state) => ({
-        error: result.error,
-        sending: false,
-        messages: state.messages.filter((m) => m.id !== optimisticMessage.id),
-      }));
-      return;
-    }
-
     try {
-        const {data, error } = await supabase.functions.invoke('family-ai-chat', {
-          body: { family_id: familyId, user_id: userId, message },
-        });
-        if (error) throw error;
+        set((state) => ({ messages: [...state.messages, optimisticMessage] }));
+    
+        const result = await invokeAiFunction('family-ai-chat', { family_id: familyId, user_id: userId, message });
+    
+        if (result.upgradeReason) {
+          set((state) => ({
+            upgradeRequired: true,
+            upgradeReason: result.upgradeReason,
+            sending: false,
+            messages: state.messages.filter((m) => m.id !== optimisticMessage.id), // roll back — message wasn't actually sent
+          }));
+          return;
+        }
+    
+        if (result.error) {
+          set((state) => ({
+            error: result.error,
+            sending: false,
+            messages: state.messages.filter((m) => m.id !== optimisticMessage.id),
+          }));
+          return;
+        }
+
+        const data = result.data as any;
         // Real messages (user + assistant) will arrive via realtime and replace/append correctly
         // Realtime will deliver the actual persisted messages — but pending_actions
         // aren't part of the message row, so store them keyed by the assistant message

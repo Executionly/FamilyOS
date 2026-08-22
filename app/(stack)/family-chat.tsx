@@ -116,7 +116,7 @@ export default function FamilyChatScreen() {
               item.role === 'typing' ? (
                 <TypingBubble />
               ) : (
-                <View className={`mb-1 max-w-[85%] ${item.role === 'user' ? 'self-end' : 'self-start'}`}>
+                <View className={`mb-3 max-w-[85%] ${item.role === 'user' ? 'self-end' : 'self-start'}`}>
                   <View
                     className={`px-4 py-3 rounded-2xl ${
                       item.role === 'user' ? 'bg-primary rounded-br-sm' : 'bg-surface border border-border rounded-bl-sm'

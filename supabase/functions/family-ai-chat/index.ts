@@ -2,6 +2,7 @@ import { serve } from 'https://deno.land/std@0.190.0/http/server.ts';
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { TOOLS, AUTO_EXECUTE_TOOLS } from './tools.ts';
 import { checkAiEntitlement, recordAiUsage } from '../_shared/entitlements.ts';
+import { APP_GUIDE_SECTIONS } from '../_shared/app-guide-content.ts';
 
 const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY')!;
 const DEEPSEEK_API_KEY = Deno.env.get('DEEPSEEK_API_KEY')!;
@@ -27,6 +28,10 @@ async function getEmbedding(text: string): Promise<number[]> {
   if (!res.ok) throw new Error(`OpenAI embedding failed: ${await res.text()}`);
   const data = await res.json();
   return data.data[0].embedding;
+}
+
+function buildAppGuideContext(): string {
+  return APP_GUIDE_SECTIONS.map((s) => `- ${s.title}: ${s.description}`).join('\n');
 }
 
 async function sendPush(familyId: string, userId: string, title: string, body: string, type = 'ai_suggestion') {
@@ -222,6 +227,11 @@ ${choresContext}
 
 Additional relevant context from this family's stories, memories, and history:
 ${retrievedContext || 'No additional relevant history found for this question.'}
+
+About the app (Fambound): use this to answer questions about what the app does, what the user can do, and how — direct them to the right place by name when relevant.
+${buildAppGuideContext()}
+
+If the user asks something like "what can you do," "what is this app," or "how do I do X," answer using the information above in your own warm, familiar voice — don't just recite it like a list. Point them to the right feature by name (e.g. "you can do that from Manage Chores") rather than describing app internals or file paths.
 
 You have tools available to take action on the family's behalf — creating events, commitments, chores, rescheduling, notifying members, or marking tasks done. When the user mentions something actionable, use the right tool. Notifications and marking tasks complete happen immediately. Everything else (creating or rescheduling events, commitments, chores, flagging conflicts) is proposed to the family for approval — so feel free to propose freely, it will always be reviewed before anything changes. Always give a natural spoken reply in addition to any tool calls.
 
