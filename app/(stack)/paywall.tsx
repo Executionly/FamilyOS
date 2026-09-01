@@ -46,10 +46,10 @@ export default function PaywallScreen() {
 
   useEffect(() => {
     if (!initDone || !family?.id) return;
-    if(Platform.OS === "ios") {
-      setLoading(false)
-      return
-    }
+    // if(Platform.OS === "ios") {
+    //   setLoading(false)
+    //   return
+    // }
     (async () => {
       setLoading(true);
       try {

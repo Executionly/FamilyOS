@@ -1,17 +1,26 @@
 import Purchases from 'react-native-purchases';
 import { Platform } from 'react-native';
 
-const REVENUECAT_API_KEY_IOS = 'appl_xxx';
+const REVENUECAT_API_KEY_IOS = process.env.EXPO_PUBLIC_REVENUECAT_API_KEY_IOS || '';
 const REVENUECAT_API_KEY_ANDROID = process.env.EXPO_PUBLIC_REVENUECAT_API_KEY_ANDROID || '';
 let purchasesInitialized = false;
 export function initPurchases(familyId: string) {
   if (purchasesInitialized) return;
-  if(Platform.OS === 'ios') return
+
+  const apiKey =
+    Platform.OS === 'ios'
+      ? REVENUECAT_API_KEY_IOS
+      : REVENUECAT_API_KEY_ANDROID;
+
+  if (!apiKey) {
+    console.warn('RevenueCat API key is missing');
+    return;
+  }
+
   purchasesInitialized = true;
   // Purchases.setLogLevel(Purchases.LOG_LEVEL.VERBOSE)
   Purchases.configure({
-    // apiKey: Platform.OS === 'ios' ? REVENUECAT_API_KEY_IOS : REVENUECAT_API_KEY_ANDROID,
-    apiKey: REVENUECAT_API_KEY_ANDROID,
+    apiKey,
     appUserID: familyId, // this is what makes app_user_id in the webhook match your family_id
   });
 }

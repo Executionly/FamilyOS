@@ -4,9 +4,11 @@ import { Image } from "expo-image";
 import { useColors } from "@/hooks/use-colors";
 import { ScreenContainer } from "@/components/screen-container";
 import { Ionicons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 
 export default function GetStartedScreen() {
+    const insets = useSafeAreaInsets();
   const router = useRouter();
   const colors = useColors();
 
@@ -38,7 +40,7 @@ export default function GetStartedScreen() {
 
                     {/* Replace this with your illustration */}
                     <View
-                        className="mb-10 h-56 w-56 items-center justify-center rounded-full"
+                        className="mb-8 h-56 w-56 items-center justify-center rounded-full"
                         style={{
                         backgroundColor: `${colors.primary}15`,
                         }}
@@ -47,22 +49,22 @@ export default function GetStartedScreen() {
                     </View>
 
                     {/* Logo */}
-                    <Text className="mb-3 text-5xl font-bold text-foreground">
+                    <Text className="mb-2 text-5xl font-bold text-foreground">
                         Fambound
                     </Text>
 
-                    <Text className="mb-3 text-center text-3xl font-bold text-foreground">
+                    <Text className="mb-2 text-center text-3xl font-bold text-foreground">
                         Build one home for everyone you love.
                     </Text>
 
-                    <Text className="mb-10 px-6 text-center text-base leading-6 text-muted">
+                    <Text className="mb-6 px-6 text-center text-base leading-6 text-muted">
                         Organize schedules, chat together, plan meals, assign chores and
                         let your family's AI keep everyone connected.
                     </Text>
 
                     {/* Features */}
 
-                    <View className="w-full gap-3">
+                    <View className="w-full gap-2">
 
                         <View className="flex-row items-center rounded-2xl border border-border bg-surface p-4">
                             <Ionicons name="calendar" size={24} color="#0369A1" />
@@ -105,7 +107,8 @@ export default function GetStartedScreen() {
 
                 {/* Bottom */}
 
-                <View className="pb-8 mt-3">
+                <View className="pb-8 mt-3"
+                style={{ paddingBottom: Math.max(insets.bottom, 14) }}>
 
                     <TouchableOpacity
                         onPress={() => router.push("/(auth)/sign-up")}
