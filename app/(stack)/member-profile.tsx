@@ -204,7 +204,7 @@ console.log("id",id)
             </Pressable>
           )}
 
-          {member.role === 'member' && isAdmin && (
+          {member.role === 'member' && isAdmin && isClaimed && (
             <Pressable
               onPress={confirmPromote}
               className="flex-row items-center justify-center rounded-xl border border-primary py-3"

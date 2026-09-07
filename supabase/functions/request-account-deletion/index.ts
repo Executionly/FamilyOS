@@ -38,7 +38,7 @@ serve(async (req) => {
     // SCHEMA: assumes `member.user_id` links to auth.users.id
     const { data: member, error: memberErr } = await supabaseAdmin
       .from("member")
-      .select("id, family_id, is_founding_admin, email")
+      .select("id, family_id, is_founding_admin")
       .eq("user_id", authUserId)
       .single();
 
@@ -51,7 +51,7 @@ serve(async (req) => {
     ).toISOString();
 
     if (!member.is_founding_admin) {
-      await tombstoneMember(member.id, authUserId, member.email, scheduledAt);
+      await tombstoneMember(member.id, authUserId, scheduledAt);
       return jsonOk({ outcome: "member_deleted", scheduledAt });
     }
 
@@ -74,7 +74,7 @@ serve(async (req) => {
         return jsonError(`Transfer failed: ${transferErr.message}`, 500);
       }
 
-      await tombstoneMember(member.id, authUserId, member.email, scheduledAt);
+      await tombstoneMember(member.id, authUserId, scheduledAt);
       await notifySuccessor(successorId);
 
       return jsonOk({ outcome: "transferred", newAdminId: successorId, scheduledAt });
@@ -92,7 +92,6 @@ serve(async (req) => {
 async function tombstoneMember(
   memberId: string,
   authUserId: string,
-  originalEmail: string,
   scheduledAt: string,
 ) {
   const tombstoneEmail = `deleted_${memberId}@familyos.internal`;
@@ -107,7 +106,6 @@ async function tombstoneMember(
       account_status: "pending_deletion",
       deletion_requested_at: new Date().toISOString(),
       deletion_scheduled_at: scheduledAt,
-      email: tombstoneEmail,
     })
     .eq("id", memberId);
 
@@ -116,7 +114,7 @@ async function tombstoneMember(
     .update({ email: tombstoneEmail })
     .eq('id', authUserId);
 
-  await supabaseAdmin.auth.admin.signOut(authUserId, "global");
+  // await supabaseAdmin.auth.admin.signOut(authUserId, "global");
 }
 
 async function cascadeDeleteFamily(familyId: string, scheduledAt: string) {
@@ -124,7 +122,7 @@ async function cascadeDeleteFamily(familyId: string, scheduledAt: string) {
   // email personalization — drop it if that column doesn't exist.
   const { data: members } = await supabaseAdmin
     .from("member")
-    .select("id, user_id, email, name")
+    .select("id, user_id, name")
     .eq("family_id", familyId)
     .not("user_id", "is", null);
 
@@ -133,7 +131,7 @@ async function cascadeDeleteFamily(familyId: string, scheduledAt: string) {
   const membersToNotify = members ?? [];
 
   for (const m of membersToNotify) {
-    await tombstoneMember(m.id, m.user_id, m.email, scheduledAt);
+    await tombstoneMember(m.id, m.user_id, scheduledAt);
   }
 
   await supabaseAdmin
@@ -219,14 +217,22 @@ function emailShell(headline: string, subheadline: string, bodyHtml: string) {
 async function notifySuccessor(successorMemberId: string) {
   const { data: successor, error } = await supabaseAdmin
     .from("member")
-    .select("email, name") // SCHEMA: adjust if the display-name column differs
+    .select("name, user_id") // SCHEMA: adjust if the display-name column differs
     .eq("id", successorMemberId)
     .single();
 
-  if (error || !successor?.email) {
+  if (error) {
     console.error("[request-account-deletion] Could not load successor for notification:", error);
     return;
   }
+
+  const { data: profile } = await supabaseAdmin
+  .from("profiles")
+  .select("email")
+  .eq("id", successor.user_id)
+  .single();
+
+  const memberEmail = profile?.email ?? "";
 
   const html = emailShell(
     "You're the founding admin now 👑",
@@ -245,10 +251,10 @@ async function notifySuccessor(successorMemberId: string) {
     `,
   );
 
-  await sendEmail(successor.email, "You're now the founding admin on Fambound", html);
+  await sendEmail(memberEmail, "You're now the founding admin on Fambound", html);
 }
 
-async function notifyFamilyOfCascade(members: { id: string; email: string; name?: string }[]) {
+async function notifyFamilyOfCascade(members: { id: string; user_id: string; name?: string }[]) {
   const html = emailShell(
     "Your family's account is being deleted",
     "This family's account owner has deleted their Fambound account.",
@@ -268,8 +274,15 @@ async function notifyFamilyOfCascade(members: { id: string; email: string; name?
 
   await Promise.all(
     members
-      .filter((m) => !!m.email)
-      .map((m) => sendEmail(m.email, "Your family's Fambound account is being deleted", html)),
+      .filter((m) => !!m.user_id)
+      .map(async(m) => {
+        const { data: profile } = await supabaseAdmin
+          .from("profiles")
+          .select("email")
+          .eq("id", m.user_id)
+          .single();
+        sendEmail(profile.email, "Your family's Fambound account is being deleted", html)
+      }),
   );
 }
 

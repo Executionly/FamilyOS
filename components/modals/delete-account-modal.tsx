@@ -1,6 +1,6 @@
 
 import { useState } from 'react';
-import { View, Text, Modal, Pressable, TextInput, ActivityIndicator, Platform, Linking } from 'react-native';
+import { View, Text, Modal, Pressable, TextInput, ActivityIndicator, Platform, Linking, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useColors } from '@/hooks/use-colors';
@@ -42,8 +42,17 @@ export function DeleteAccountModal({ visible, onClose, isFoundingAdmin }: Delete
       const { error } = await supabase.functions.invoke('request-account-deletion');
       if (error) throw error;
 
-      await signOut();
-      router.replace('/(auth)/sign-in'); // adjust to your actual auth route
+      Alert.alert(
+        'Account Deletion Requested',
+        'Your account deletion request has been submitted. Your account and data will be permanently deleted in 7 days.',
+        [{ text: 'OK', onPress: async () => 
+        {
+          await signOut();
+          router.replace('/get-started')
+        }
+        }],
+      );
+      ; // adjust to your actual auth route
     } catch (err: any) {
       console.error('Account deletion failed:', err);
       setErrorMessage('Something went wrong. Please try again, or contact support if this persists.');

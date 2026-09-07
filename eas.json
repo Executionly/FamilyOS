@@ -22,6 +22,12 @@
     }
   },
   "submit": {
-    "production": {}
+    "production": {
+      "ios": {
+        "appleId": "oluwafemiayobami2@gmail.com",
+        "ascAppId": "6807088369",
+        "appleTeamId": "RV872337RW"
+      }
+    }
   }
 }

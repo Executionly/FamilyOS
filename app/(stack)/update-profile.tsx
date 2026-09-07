@@ -55,7 +55,6 @@ export default function AccountSettingsScreen() {
           .single();
   
         if (data) {
-          setFullName(data.full_name ?? '');
           setCountry(data.country ?? null);
           setEthnicity(data.ethnicity ?? '');
         }
@@ -63,11 +62,12 @@ export default function AccountSettingsScreen() {
         // Personal fields live on member, not profiles
         const { data: memberData } = await supabase
           .from('member')
-          .select('date_of_birth, bio, phone_number, avatar_url')
+          .select('name, date_of_birth, bio, phone_number, avatar_url')
           .eq('id', memberProfileId)
           .single();
 
         if (memberData) {
+          setFullName(memberData.name ?? '');
           setMemberAvatar(memberData?.avatar_url)
           setDateOfBirth(memberData.date_of_birth ? new Date(memberData.date_of_birth) : null);
           setBio(memberData.bio ?? '');

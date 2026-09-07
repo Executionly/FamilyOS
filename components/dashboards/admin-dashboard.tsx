@@ -281,7 +281,10 @@ export default function AdminDashboard() {
     scrollOffsetRef={scrollOffsetRef}
     scrollContainerYRef={scrollContainerYRef}
     >
-      <DashboardTourStarter hasSeenGuide={!!currentMember?.dashboard_guide_seen_at} />
+      <DashboardTourStarter 
+      hasSeenGuide={true} 
+      // hasSeenGuide={!!currentMember?.dashboard_guide_seen_at} 
+      />
 
       <ScreenContainer containerClassName="bg-background" safeAreaClassName="bg-background">
         <View

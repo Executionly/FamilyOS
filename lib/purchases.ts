@@ -6,7 +6,7 @@ const REVENUECAT_API_KEY_ANDROID = process.env.EXPO_PUBLIC_REVENUECAT_API_KEY_AN
 let purchasesInitialized = false;
 export function initPurchases(familyId: string) {
   if (purchasesInitialized) return;
-
+  // return
   const apiKey =
     Platform.OS === 'ios'
       ? REVENUECAT_API_KEY_IOS
@@ -18,7 +18,7 @@ export function initPurchases(familyId: string) {
   }
 
   purchasesInitialized = true;
-  // Purchases.setLogLevel(Purchases.LOG_LEVEL.VERBOSE)
+  Purchases.setLogLevel(Purchases.LOG_LEVEL.VERBOSE)
   Purchases.configure({
     apiKey,
     appUserID: familyId, // this is what makes app_user_id in the webhook match your family_id
