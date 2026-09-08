@@ -236,7 +236,7 @@ export default function PaywallScreen() {
 
         <Pressable
           onPress={handlePurchase}
-          disabled={purchasing || confirming || !selectedPackage || Platform.OS === "ios"}
+          disabled={purchasing || confirming || !selectedPackage}
           className="items-center rounded-2xl bg-primary py-4"
         >
           {purchasing || confirming ? (
@@ -251,7 +251,7 @@ export default function PaywallScreen() {
           )}
         </Pressable>
 
-        <Pressable onPress={handleRestore} disabled={purchasing || Platform.OS === "ios"} 
+        <Pressable onPress={handleRestore} disabled={purchasing} 
         className="mt-4 items-center mb-4">
           <Text className="text-xs font-semibold text-muted">Restore Purchases</Text>
         </Pressable>
