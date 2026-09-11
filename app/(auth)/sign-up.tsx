@@ -301,12 +301,12 @@ export default function SignUpScreen() {
               <View className="flex-1 h-px bg-border" />
             </View>
 
-            <Pressable
+            <TouchableOpacity
               onPress={() => router.push('/(auth)/join-family')}
-              className="py-3 items-center border border-primary rounded-lg mb-4"
+              className="py-3 px-4 border border-primary rounded-lg mb-4"
             >
-              <Text className="text-primary text-sm font-semibold">Join a Family</Text>
-            </Pressable>
+              <Text className="text-primary text-center text-sm font-semibold">Join a Family</Text>
+            </TouchableOpacity>
 
             {/* OAuth Buttons */}
             {/* <View className="gap-3 mb-6">
