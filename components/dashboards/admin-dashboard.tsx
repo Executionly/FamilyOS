@@ -199,7 +199,7 @@ export default function AdminDashboard() {
     setLoading(true);
     try {
       Promise.all([
-        fetchFamilyForUser(currentMember?.user_id!),
+        // fetchFamilyForUser(currentMember?.user_id!),
         fetchMeetings(family.id),
         fetchCommitments(family.id),
         fetchEvents(family.id),
