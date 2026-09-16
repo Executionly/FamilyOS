@@ -54,6 +54,12 @@ module.exports = {
   },
   plugins: [
     "expo-router",
+    // "expo-audio",
+    "expo-font",
+    "expo-image",
+    "expo-secure-store",
+    "expo-status-bar",
+    "expo-web-browser",
     [
       "expo-video",
       {

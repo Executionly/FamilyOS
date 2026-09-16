@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 export type EventCategory =
   | 'school' | 'medical' | 'travel' | 'financial' | 'activity' | 'household' | 'routine' | 'general'
-  | 'birthday' | 'anniversary' | 'celebration';
+  | 'birthday' | 'anniversary' | 'celebration' | 'challenge';
 
 export const CATEGORIES: { key: EventCategory; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
   { key: 'general', label: 'General', icon: 'calendar-outline' },
@@ -16,6 +16,7 @@ export const CATEGORIES: { key: EventCategory; label: string; icon: keyof typeof
   { key: 'birthday', label: 'Birthday', icon: 'gift-outline' },
   { key: 'anniversary', label: 'Anniversary', icon: 'heart-outline' },
   { key: 'celebration', label: 'Celebration', icon: 'star-outline' },
+  { key: 'challenge', label: 'Challenge', icon: 'trophy-outline' },
 ];
 
 // Categories that are date-only (no meaningful time-of-day) and recur every year by nature

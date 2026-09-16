@@ -186,6 +186,19 @@ serve(async (req) => {
       .map((c: any) => `${c.title}${c.member?.name ? ` (${c.member.name})` : ''}${c.due_date ? ` — due ${new Date(c.due_date).toLocaleDateString()}` : ''}`)
       .join('\n') || 'No open chores.';
 
+    const { data: activeChallenge } = await supabase
+      .from('family_challenge')
+      .select('title, description, category, participant_ids, accepted_at')
+      .eq('family_id', family_id)
+      .eq('status', 'accepted')
+      .order('accepted_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const challengeContext = activeChallenge
+      ? `"${activeChallenge.title}" (${activeChallenge.category}) — ${activeChallenge.description}. ${activeChallenge.participant_ids?.length ?? 0} of ${(members ?? []).length} family members have joined in.`
+      : 'No active challenge right now.';
+
     // ── 8. Chat history ───────────────────────────────────────────
     const { data: history } = await supabase
       .from('family_chat_messages')
@@ -224,6 +237,9 @@ ${commitmentsContext}
 
 Open chores:
 ${choresContext}
+
+Current family challenge:
+${challengeContext}
 
 Additional relevant context from this family's stories, memories, and history:
 ${retrievedContext || 'No additional relevant history found for this question.'}

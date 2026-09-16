@@ -336,6 +336,7 @@ import { supabase } from '@/lib/_core/supabase';
 import { CoachmarkProvider } from '@/lib/coachmark/coachmark-context';
 import { DashboardTourStarter } from './admin-dashboard';
 import { CoachmarkTarget } from '../coachmark/coachmark-target';
+import { FamilyChallengeCard } from '../family-challenge-card';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -583,7 +584,7 @@ export function MemberDashboard() {
                       </Text>
                     </View>
                   )}
-
+                  <FamilyChallengeCard />
                   {/* ── Stat cards row ──────────────────────────────── */}
                   <CoachmarkTarget id="stats" order={4} title="Your daily snapshot" description="Open tasks, today's events, and chores due — everything that needs attention today.">
                     <View className="mb-4 flex-row gap-2.5">

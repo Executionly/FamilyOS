@@ -23,6 +23,7 @@ import { CoachmarkProvider, useCoachmark } from '@/lib/coachmark/coachmark-conte
 import { supabase } from '@/lib/_core/supabase';
 import { CoachmarkOverlay } from '../coachmark/coachmark-overlay';
 import { CoachmarkTarget } from '../coachmark/coachmark-target';
+import { FamilyChallengeCard } from '../family-challenge-card';
 
 // ── Brand palette ────────────────────────────────────────────
 const NAVY = '#044768';
@@ -198,6 +199,7 @@ export default function AdminDashboard() {
     setLoading(true);
     try {
       Promise.all([
+        fetchFamilyForUser(currentMember?.user_id!),
         fetchMeetings(family.id),
         fetchCommitments(family.id),
         fetchEvents(family.id),
@@ -447,6 +449,7 @@ export default function AdminDashboard() {
                 </Pressable>
               </CoachmarkTarget>
             )}
+            <FamilyChallengeCard />
             {/* ── Stat cards row ──────────────────────────────── */}
             <CoachmarkTarget id="stats" order={4} title="Your daily snapshot" description="Open tasks, today's events, and chores due — everything that needs attention today.">
               <View style={{ flexDirection: 'row', gap: 10, marginBottom: 16 }}>

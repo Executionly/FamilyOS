@@ -32,6 +32,7 @@ export default function StackLayout() {
       <Stack.Screen name="media-library" />
       <Stack.Screen name="member-profile" />
       <Stack.Screen name="guide" />
+      <Stack.Screen name="challenge-cadence" />
     </Stack>
   );
 }

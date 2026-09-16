@@ -9,7 +9,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
 interface EmbedRequest {
   family_id: string;
-  source_type: 'charter' | 'meeting' | 'story' | 'memory' | 'commitment';
+  source_type: 'charter' | 'meeting' | 'story' | 'memory' | 'commitment' | 'event' | 'timeline_event' | 'chore' | 'member' | 'meal' | 'meal_plan' | 'challenge';
   source_id: string;
   content: string;
 }

@@ -45,7 +45,9 @@ export default function ProfileScreen() {
     { icon: 'people-outline', label: 'Family Members', description: 'Add, invite, and manage everyone in your family', route: '/(stack)/member-list', open: true, premium: true },
     { icon: 'restaurant-outline', label: 'Meal Planner', description: "Plan meals and build your family's weekly menu", route: '/(stack)/meal', open: true, premium: isPremium },
     { icon: 'construct-outline', label: 'Manage Chores', description: "Assign chores and track who's completed what", route: '/(stack)/chores', open: true, premium: true },
+    // { icon: 'game-controller-outline', label: 'Family Games', description: 'Play games together as a family', route: '/(stack)/games', open: true, premium: true },    
     { icon: 'calendar-outline', label: 'Calendar (School schedules, Travel plans...) ', description: 'School schedules, appointments, travel plans, birthdays & more', route: '/(stack)/calendar', open: true, premium: true },
+    { icon: 'trophy-outline', label: 'Family Challenges', description: 'Accept fun, values-based challenges as a family', route: '/(stack)/challenge-list', open: true, premium: true },    
     { icon: 'images-outline', label: 'Family Media', description: "Store and browse your family's photos and videos", route: '/(stack)/media-library', open: true, premium: true },
     { icon: 'person-outline', label: 'Account Settings', description: 'Manage your profile, subscription, and account', route: '/(stack)/account-settings', open: true, premium: true },
     {
@@ -217,7 +219,7 @@ return (
           >
             {MENU_ITEMS.map((item, index) => (
               <TouchableOpacity
-                key={item.route}
+                key={index}
                 disabled={!item.open}
                 onPress={() => {
                   if (!item.premium) openPremiumModal();

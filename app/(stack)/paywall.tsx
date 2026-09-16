@@ -24,7 +24,7 @@ export default function PaywallScreen() {
   const router = useRouter();
   const colors = useColors();
   const { initialize } = useAuthStore();
-  const { family } = useFamilyStore();
+  const { family, currentMember, fetchFamilyForUser } = useFamilyStore();
   const {onboarded} = useLocalSearchParams()
 
   const [offering, setOffering] = useState<any>(null);
@@ -87,6 +87,7 @@ export default function PaywallScreen() {
       setConfirming(false);
 
       if (confirmed) {
+        await fetchFamilyForUser(currentMember?.user_id!)
         router.back();
       } else {
         // Purchase went through on RevenueCat's side, but our webhook hasn't
@@ -122,6 +123,7 @@ export default function PaywallScreen() {
       setConfirming(false);
 
       if (confirmed) {
+        await fetchFamilyForUser(currentMember?.user_id!)
         router.back();
       } else {
         setError(

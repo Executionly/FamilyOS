@@ -14,7 +14,7 @@ export function AppHeader({ title, subtitle, showBack = false, onBack, right }: 
   const router = useRouter();
 
   return (
-    <View className="flex-row items-center justify-between mb-6 px-6 pb-3 border-b border-b-gray-200">
+    <View className="flex-row items-center justify-between mb-4 px-6 pb-3 border-b border-b-gray-200">
       {showBack && 
       <Pressable onPress={() => router.back()}
       className="flex-row items-center">

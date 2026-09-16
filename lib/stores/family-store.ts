@@ -42,6 +42,7 @@ export interface Family {
   subscription_tier: 'free' | 'premium';
   created_at: string;
   updated_at: string;
+  challenge_cadence: string;
   image_url?: string;
 }
 
