@@ -13,6 +13,8 @@ import { ToastHost } from '@/components/ToastHost';
 import { BriefingModal } from '@/components/briefing-modal';
 import { StatusBar } from 'expo-status-bar';
 import {SafeAreaProvider} from 'react-native-safe-area-context'
+import { GameInviteTray } from '@/components/modals/GameInviteTray';
+
 
 SplashScreen.preventAutoHideAsync();
 
@@ -40,7 +42,8 @@ export default function RootLayout() {
             <ThemeProvider>
               <StatusBar style='dark'/>
               <ToastHost />
-              {/* <BriefingModal /> */}
+              <BriefingModal />
+              <GameInviteTray />
                 <Stack
                   screenOptions={{
                     headerShown: false,

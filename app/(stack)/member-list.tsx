@@ -65,13 +65,13 @@ function MemberAvatar({ member, colors }: {
 
   return (
     <View
-      className="w-11 h-11 rounded-full items-center justify-center mr-3 overflow-hidden"
-      style={{ backgroundColor: colors.primary + '20' }}
+      className="w-12 h-12 rounded-full items-center justify-center mr-3 overflow-hidden border-2"
+      style={{ backgroundColor: colors.primary + '15', borderColor: colors.primary + '30' }}
     >
       {signedUrl ? (
-        <Image source={{ uri: signedUrl }} resizeMode="cover" className="w-11 h-11" />
+        <Image source={{ uri: signedUrl }} resizeMode="cover" className="w-12 h-12" />
       ) : (
-        <Text className="text-sm font-bold text-primary">{getInitials(member.name)}</Text>
+        <Text className="text-sm font-black text-primary">{getInitials(member.name)}</Text>
       )}
     </View>
   );
@@ -83,7 +83,7 @@ export default function MembersScreen() {
   const { family, members, 
     loading, fetchMembers, 
     currentMember, promoteMember, 
-    demoteMember, getAvatarSignedUrl } = useFamilyStore();
+    demoteMember } = useFamilyStore();
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const isAdmin = isAdminAccess(currentMember?.role);
@@ -134,7 +134,7 @@ export default function MembersScreen() {
     return (
       <ScreenContainer containerClassName="bg-background" safeAreaClassName="bg-background">
         <View className="flex-1 items-center justify-center">
-          <ActivityIndicator color={colors.primary} />
+          <ActivityIndicator size="large" color={colors.primary} />
         </View>
       </ScreenContainer>
     );
@@ -148,26 +148,38 @@ export default function MembersScreen() {
           isAdmin ? (
             <TouchableOpacity
               onPress={() => router.push('/(stack)/add-member')}
-              className="flex-row items-center justify-center py-2 px-3 rounded-xl bg-primary"
+              className="flex-row items-center justify-center py-2 px-4 rounded-xl bg-primary"
             >
-              <Ionicons name="person-add-outline" size={15} color="#fff" />
-              <Text className="text-white text-sm font-semibold ml-2">Add</Text>
+              <Ionicons name="person-add" size={14} color="#fff" />
+              <Text className="text-white text-xs font-black ml-1.5 uppercase tracking-wider">Add</Text>
             </TouchableOpacity>
           ) : null
         }
         showBack
       />
-      <View className="flex-1 px-4 pt-4">
+      <View className="flex-1 px-5 pt-3">
+        {/* HERO TITLE BLOCK */}
+        <View className="mb-6">
+          <Text className="text-[11px] font-black text-primary uppercase tracking-widest mb-1">Your Circle</Text>
+          <Text className="text-3xl font-black text-foreground">Family Circle</Text>
+          <Text className="text-xs text-muted font-medium mt-1">Manage family members, view profiles, and invite contributors.</Text>
+        </View>
+
         <FlatList
           data={members}
           keyExtractor={(item) => item.id}
-          contentContainerStyle={{ paddingBottom: 24 }}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: 40 }}
           ListEmptyComponent={
-            <View className="items-center justify-center py-16">
-              <Text className="text-muted text-base">No members yet</Text>
+            <View style={{ backgroundColor: colors.surface, borderColor: colors.border }} className="items-center justify-center py-16 rounded-3xl border border-dashed">
+              <View style={{ backgroundColor: `${colors.primary}10` }} className="w-16 h-16 rounded-2xl items-center justify-center mb-4">
+                <Ionicons name="people-outline" size={28} color={colors.primary} />
+              </View>
+              <Text className="text-base font-black text-foreground mb-1">No family members</Text>
+              <Text className="text-xs text-muted text-center max-w-[200px] leading-relaxed">Add profiles or share join codes to assemble your unit.</Text>
             </View>
           }
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleFetch} />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleFetch} tintColor={colors.primary} />}
           renderItem={({ item }) => {
             const isManaged = NO_CODE_AGE_BANDS.includes(item.age_band ?? '');
             const isClaimed = !!item.user_id;
@@ -177,120 +189,147 @@ export default function MembersScreen() {
             return (
               <Pressable
                 onPress={() => router.push(`/(stack)/member-profile?id=${item.id}`)}
-                className="p-4 rounded-xl mb-3 border border-border"
                 style={({ pressed }) => ({
                   backgroundColor: colors.surface,
-                  borderColor: colors.border,
+                  // borderColor: colors.,
                   opacity: pressed ? 0.85 : 1,
                 })}
+                className="p-5 rounded-3xl mb-4 border border-gray-200 shadow-xs"
               >
                 <View className="flex-row items-center">
-                  {/* Avatar */}
-                  <View
-                    className="w-11 h-11 rounded-full items-center justify-center mr-3 overflow-hidden"
-                    style={{ backgroundColor: colors.primary + '20' }}
-                  >
-                    {item.avatar_url ? (
-                      <MemberAvatar member={item} colors={colors}/>
-                    ) : (
-                      <Text className="text-sm font-bold text-primary">{getInitials(item.name)}</Text>
-                    )}
-                  </View>
+                  {/* Avatar Column */}
+                  {item.avatar_url ? (
+                    <MemberAvatar member={item} colors={colors}/>
+                  ) : (
+                    <View
+                      className="w-12 h-12 rounded-full items-center justify-center mr-3 overflow-hidden border-2"
+                      style={{ backgroundColor: colors.primary + '15', borderColor: colors.primary + '30' }}
+                    >
+                      <Text className="text-sm font-black text-primary">{getInitials(item.name)}</Text>
+                    </View>
+                  )}
 
+                  {/* Info Column */}
                   <View className="flex-1">
                     <View className="flex-row items-center justify-between">
-                      <Text className="text-base font-semibold text-foreground">{item.name}</Text>
-                      <View className="px-2 py-1 rounded-full bg-primary/10">
-                        <Text className="text-xs font-medium text-primary capitalize">{item.role}</Text>
+                      <Text className="text-base font-black text-foreground" numberOfLines={1}>
+                        {item.name} {isMe && '(You)'}
+                      </Text>
+                      
+                      <View style={{ backgroundColor: `${colors.primary}10` }} className="px-2.5 py-1 rounded-lg">
+                        <Text style={{ color: colors.primary }} className="text-[10px] font-extrabold capitalize tracking-wider">{item.role}</Text>
                       </View>
                     </View>
                     {(age !== null || item.age_band) && (
-                      <Text className="text-xs text-muted mt-0.5 capitalize">
-                        {age !== null ? `${age} years old` : item.age_band}
+                      <Text className="text-xs text-muted mt-1 font-semibold capitalize">
+                        {age !== null ? `${age} yrs old` : item.age_band}
                       </Text>
                     )}
                   </View>
 
-                  <Ionicons name="chevron-forward" size={18} color={colors.muted} style={{ marginLeft: 8 }} />
+                  <Ionicons name="chevron-forward" size={16} color={colors.muted} style={{ marginLeft: 12 }} />
                 </View>
 
-                <View className="flex-row items-center gap-2 flex-wrap mt-2">
-                  {item.role === 'member' && isAdmin &&  isClaimed &&(
-                    <Pressable
-                      onPress={(e) => {
-                        e.stopPropagation();
-                        confirmPromote(item);
-                      }}
-                      className="mt-2 flex-row items-center rounded-lg border border-primary bg-primary/10 px-3 py-1.5 self-start"
-                    >
-                      <Ionicons name="shield-checkmark-outline" size={14} color={colors.primary} />
-                      <Text className="ml-1.5 text-xs font-semibold text-primary">Make Admin</Text>
-                    </Pressable>
-                  )}
-
-                  {item.role === 'admin' && !item.is_founding_admin && isAdmin && isClaimed && (
-                    <Pressable
-                      onPress={(e) => {
-                        e.stopPropagation();
-                        confirmDemote(item);
-                      }}
-                      className="mt-2 flex-row items-center rounded-lg border border-red-500 px-3 py-1.5 self-start"
-                    >
-                      <Text className="text-xs font-semibold text-red-400">Remove Admin</Text>
-                    </Pressable>
+                {/* Tags and Custom Status Badges */}
+                <View className="flex-row items-center gap-2 flex-wrap mt-2.5">
+                  {isManaged ? (
+                    <View style={{ backgroundColor: `${colors.muted}15` }} className="flex-row items-center px-2.5 py-1.5 rounded-xl border border-border/40">
+                      <Ionicons name="lock-closed" size={11} color={colors.muted} />
+                      <Text className="text-[10px] font-bold text-muted ml-1 uppercase">Managed Profile</Text>
+                    </View>
+                  ) : isClaimed ? (
+                    <View style={{ backgroundColor: '#10B98110', borderColor: '#10B98130' }} className="flex-row items-center px-2.5 py-1.5 rounded-xl border">
+                      <Ionicons name="checkmark-circle" size={11} color="#10B981" />
+                      <Text className="text-[10px] font-black text-emerald-600 ml-1 uppercase">Joined</Text>
+                    </View>
+                  ) : (
+                    <View style={{ backgroundColor: '#F59E0B10', borderColor: '#F59E0B30' }} className="flex-row items-center px-2.5 py-1.5 rounded-xl border">
+                      <Ionicons name="mail" size={11} color="#F59E0B" />
+                      <Text className="text-[10px] font-black text-amber-600 ml-1 uppercase">Invited</Text>
+                    </View>
                   )}
 
                   {item.is_founding_admin && (
-                    <View className="mt-2 flex-row items-center self-start rounded-lg bg-amber-50 px-3 py-1.5">
-                      <Ionicons name="star" size={12} color="#D97706" />
-                      <Text className="ml-1 text-xs font-semibold text-amber-700">Owner</Text>
+                    <View style={{ backgroundColor: '#D9770615' }} className="flex-row items-center rounded-xl px-2.5 py-1.5">
+                      <Ionicons name="star" size={11} color="#D97706" />
+                      <Text className="ml-1 text-[10px] font-black text-amber-700 uppercase">Creator</Text>
                     </View>
-                  )}
-
-                  {!isMe && isClaimed && (
-                    <Pressable
-                      onPress={(e) => {
-                        e.stopPropagation();
-                        router.push(`/dm?userId=${item.user_id}`);
-                      }}
-                      className="mt-2 flex-row items-center gap-1.5 rounded-lg border border-primary bg-primary/10 px-3 py-1.5 self-start"
-                    >
-                      <Ionicons name="chatbubble-outline" size={13} color={colors.primary} />
-                      <Text className="text-xs font-semibold text-primary">Message</Text>
-                    </Pressable>
                   )}
                 </View>
 
-                {isManaged ? (
-                  <View className="flex-row items-center mt-2">
-                    <Ionicons name="shield-checkmark-outline" size={14} color={colors.muted} />
-                    <Text className="text-xs text-muted ml-1">Managed profile — no login</Text>
+                {/* SIGNUP CODE BLOCK */}
+                {!isManaged && !isClaimed && item.signup_code && isAdmin && (
+                  <View className="mt-4 pt-4 border-t" style={{ borderTopColor: colors.border }}>
+                    <Text className="text-[9px] font-bold text-muted uppercase tracking-widest mb-1.5 ml-1">Share Code to Join</Text>
+                    <Pressable
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        handleCopy(item.signup_code!, item.id);
+                      }}
+                      style={{ backgroundColor: colors.background, borderWidth: 1.5, borderColor: colors.border }}
+                      className="flex-row items-center justify-between px-3.5 py-3 rounded-2xl"
+                    >
+                      <Text className="text-base font-black tracking-widest text-foreground">
+                        {item.signup_code}
+                      </Text>
+                      <View className="flex-row items-center">
+                        {copiedId === item.id ? (
+                          <Text className="text-xs text-primary font-black mr-2">Copied!</Text>
+                        ) : null}
+                        <Ionicons name="copy-outline" size={16} color={colors.primary} />
+                      </View>
+                    </Pressable>
                   </View>
-                ) : isClaimed ? (
-                  <View className="flex-row items-center mt-2">
-                    <Ionicons name="checkmark-circle" size={14} color={colors.success ?? 'green'} />
-                    <Text className="text-xs text-muted ml-1">Joined</Text>
+                )}
+
+                {/* INTERACTIVE ACTIONS */}
+                {( (item.role === 'member' && isAdmin && isClaimed) || 
+                   (item.role === 'admin' && !item.is_founding_admin && isAdmin && isClaimed) || 
+                   (!isMe && isClaimed) ) && (
+                  <View className="flex-row items-center gap-2 flex-wrap mt-3 pt-3 border-t" style={{ borderTopColor: colors.border }}>
+                    {item.role === 'member' && isAdmin && isClaimed && (
+                      <Pressable
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          confirmPromote(item);
+                        }}
+                        style={{ borderColor: colors.primary, backgroundColor: `${colors.primary}08` }}
+                        className="flex-row items-center rounded-xl border px-3 py-2"
+                      >
+                        <Ionicons name="shield-checkmark" size={13} color={colors.primary} />
+                        <Text className="ml-1.5 text-xs font-bold text-primary">Make Admin</Text>
+                      </Pressable>
+                    )}
+
+                    {item.role === 'admin' && !item.is_founding_admin && isAdmin && isClaimed && (
+                      <Pressable
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          confirmDemote(item);
+                        }}
+                        style={{ borderColor: '#EF4444' }}
+                        className="flex-row items-center rounded-xl border px-3 py-2"
+                      >
+                        <Ionicons name="close" size={13} color="#EF4444" />
+                        <Text className="ml-1.5 text-xs font-bold text-red-500">Remove Admin</Text>
+                      </Pressable>
+                    )}
+
+                    {!isMe && isClaimed && (
+                      <Pressable
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          router.push(`/dm?userId=${item.user_id}`);
+                        }}
+                        style={{ borderColor: colors.border, backgroundColor: colors.background }}
+                        className="flex-row items-center rounded-xl border px-3.5 py-2 ml-auto"
+                      >
+                        <Ionicons name="chatbubble-ellipses-outline" size={13} color={colors.foreground} />
+                        <Text className="text-xs font-bold text-foreground ml-1.5">Message</Text>
+                      </Pressable>
+                    )}
                   </View>
-                ) : item.signup_code && isAdmin ? (
-                  <Pressable
-                    onPress={(e) => {
-                      e.stopPropagation();
-                      handleCopy(item.signup_code!, item.id);
-                    }}
-                    className="flex-row items-center justify-between mt-2 px-3 py-2 rounded-lg"
-                    style={{ backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border }}
-                  >
-                    <Text className="text-base font-bold tracking-widest text-foreground">
-                      {item.signup_code}
-                    </Text>
-                    <View className="flex-row items-center">
-                      {copiedId === item.id ? (
-                        <Text className="text-xs text-primary font-medium mr-1">Copied!</Text>
-                      ) : null}
-                      <Ionicons name="copy-outline" size={16} color={colors.muted} />
-                    </View>
-                  </Pressable>
-                ) : null}
+                )}
               </Pressable>
             );
           }}

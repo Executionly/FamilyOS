@@ -154,45 +154,46 @@ export function FamilyChallengeCard() {
             {activeChallenge.description}
           </Text>
 
-          <View className="mt-4 flex-row items-center gap-2">
             {activeChallenge.estimated_minutes && (
-              <View className="flex-row items-center gap-1.5">
+              <View className="flex-row items-center gap-1.5 mt-2 mb-2">
                 <Ionicons name="time-outline" size={13} color="rgba(255,255,255,0.6)" />
                 <Text className="text-[12px] font-medium text-white/60">
                   {activeChallenge.estimated_minutes} min
                 </Text>
               </View>
             )}
-            <MemberAvatarStack members={members ?? []} />
-          </View>
           <View className="flex-row items-center justify-between">
-            <Text className="text-[12px] font-medium text-white/60">
-              {activeChallenge.participant_ids?.length ?? 0} of {(members ?? []).length} joined
-            </Text>
+            <View>
+              <MemberAvatarStack members={members ?? []} />
+              <Text className="text-[12px] font-medium text-white/60 mt-1">
+                {activeChallenge.participant_ids?.length ?? 0} of {(members ?? []).length} joined
+              </Text>
+            </View>
             <Pressable onPress={() => router.push(`/(stack)/challenge?id=${activeChallenge.id}`)}>
               <Text className="text-[12px] font-bold text-white underline">View Challenge</Text>
             </Pressable>
           </View>
 
-          {currentMember?.id && !activeChallenge.participant_ids?.includes(currentMember.id) && (
-            <Pressable
-              onPress={() => participate()}
-              className="mt-4 mr-2 self-start rounded-xl bg-white/15 px-4.5 py-2.5"
-            >
-              <Text className="text-[13px] font-bold text-white">I'm In</Text>
-            </Pressable>
-          )}
           {!showReflection ? (
-            <View>
-              <Pressable
+            <View className='flex-row items-center justify-between gap-4 mt-4'>
+              {currentMember?.id && !activeChallenge.participant_ids?.includes(currentMember.id) && (
+                <Pressable
+                  onPress={() => participate()}
+                  className="rounded-xl bg-white/15 px-5 py-2.5"
+                >
+                  <Text className="text-[13px] font-bold text-white text-center">I'm In</Text>
+                </Pressable>
+              )}
+              {currentMember?.id && activeChallenge.participant_ids?.includes(currentMember.id) && <Pressable
                 onPress={() => setShowReflection(true)}
-                className="mt-5 flex-row items-center gap-2 self-start rounded-xl bg-[#FE6A50] px-5 py-2"
+                className="flex-row items-center gap-2 rounded-xl bg-[#FE6A50] px-5 py-2"
               >
                 <Ionicons name="checkmark-circle" size={16} color="#fff" />
-                <Text className="text-[13px] font-bold text-white">Mark Complete</Text>
-              </Pressable>
-              <Pressable onPress={() => family?.id && skip(family.id, isPremium)} className="mt-4 ml-3">
-                <Text className="text-[13px] font-semibold text-white/60">Skip</Text>
+                <Text className="text-[13px] font-bold text-white text-center">Mark Complete</Text>
+              </Pressable>}
+              <Pressable onPress={() => family?.id && skip(family.id, isPremium)} 
+              className="">
+                <Text className="text-[13px] font-semibold text-white/60 text-center">Skip</Text>
               </Pressable>
             </View>
           ) : (

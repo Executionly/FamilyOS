@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { supabase } from '@/lib/_core/supabase';
 import { useToastStore } from './toast-store';
 import { GAME_META } from '@/constants/games';
+import { notifyAssignment } from '../services/notify';
 
 export interface GameQuestion {
   id: string;
@@ -23,9 +24,13 @@ export interface GameSession {
   family_id: string;
   game_type: 'bible_trivia' | 'quiz';
   mode: 'solo' | 'multiplayer';
-  status: 'waiting' | 'in_progress' | 'completed';
+  status: 'waiting' | 'in_progress' | 'completed' | 'cancelled' | 'paused';
   question_ids: string[];
   current_question_index: number;
+  paused_at: string;
+  question_started_at: string;
+  invited_member_ids: any[];
+  lobby_deadline: string;
   created_by: string;
 }
 
@@ -45,11 +50,19 @@ interface GameState {
   ) => Promise<GameSession | null>;
   joinSession: (sessionId: string, memberId: string) => Promise<void>;
   submitAnswer: (participantId: string, questionId: string, selectedIndex: number, timeTakenMs: number) => Promise<boolean>;
-  advanceQuestion: (sessionId: string) => Promise<void>;
+  advanceQuestion: (sessionId: string, expectedCurrentIndex: number) => Promise<void>;
   endSession: (sessionId: string) => Promise<void>;
   subscribeToSession: (sessionId: string) => void;
-  subscribeToInvites: (familyId: string, myUserId: string) => void;
+  // subscribeToInvites: (familyId: string, myUserId: string) => void;
   unsubscribeFromSession: () => void;
+  beginMultiplayerGame: (sessionId: string) => Promise<void>;
+
+  findActiveSession: (familyId: string, memberId: string) => Promise<GameSession | null>;
+  inviteAndStart: (familyId: string, createdBy: string, memberId: string, gameType: 'bible_trivia'|'quiz', invitedMemberIds: string[], options?: any) => Promise<GameSession | null>;
+  cancelSession: (sessionId: string) => Promise<void>;
+  pauseSession: (sessionId: string) => Promise<void>;
+  resumeSession: (sessionId: string) => Promise<void>;
+  refreshParticipants: (sessionId: string) => Promise<void>;
 }
 
 export const useGameStore = create<GameState>((set, get) => ({
@@ -61,6 +74,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   dailyLimitReached: false,
   channel: null,
 
+  // startSession — multiplayer now creates in 'waiting' status, not 'in_progress'
   startSession: async (familyId, createdBy, memberId, gameType, mode, options) => {
     set({ loading: true, error: null, dailyLimitReached: false });
     try {
@@ -78,13 +92,15 @@ export const useGameStore = create<GameState>((set, get) => ({
       }
 
       const questionIds = data.question_ids;
+      const isMultiplayer = mode === 'multiplayer';
 
       const { data: session, error: sessionError } = await supabase
         .from('game_session')
         .insert([{
           family_id: familyId, game_type: gameType, mode,
-          question_ids: questionIds, created_by: createdBy, status: 'in_progress',
-          question_started_at: new Date().toISOString(),
+          question_ids: questionIds, created_by: createdBy,
+          status: isMultiplayer ? 'waiting' : 'in_progress',
+          question_started_at: isMultiplayer ? null : new Date().toISOString(),
         }])
         .select()
         .single();
@@ -102,7 +118,6 @@ export const useGameStore = create<GameState>((set, get) => ({
         .select('id, question, options, explanation')
         .in('id', questionIds);
 
-      // Preserve the AI's intended order rather than however Postgres returns them
       const orderedQuestions = questionIds.map((id: string) => questions?.find((q) => q.id === id)).filter(Boolean);
 
       set({
@@ -117,6 +132,17 @@ export const useGameStore = create<GameState>((set, get) => ({
       set({ error: error instanceof Error ? error.message : 'Failed to start game', loading: false });
       return null;
     }
+  },
+
+  // New — host taps "Start" in the lobby, this kicks the game off for everyone at once
+  beginMultiplayerGame: async (sessionId: string) => {
+    const { data, error } = await supabase
+      .from('game_session')
+      .update({ status: 'in_progress', question_started_at: new Date().toISOString() })
+      .eq('id', sessionId)
+      .select()
+      .single();
+    if (!error && data) set({ currentSession: data });
   },
 
   joinSession: async (sessionId: string, memberId: string) => {
@@ -153,14 +179,14 @@ export const useGameStore = create<GameState>((set, get) => ({
     }
   },
 
-  advanceQuestion: async (sessionId: string) => {
+  advanceQuestion: async (sessionId: string, expectedCurrentIndex: number) => {
     const session = get().currentSession;
     if (!session) return;
 
-    const nextIndex = session.current_question_index + 1;
+    const nextIndex = expectedCurrentIndex + 1;
     const isLast = nextIndex >= session.question_ids.length;
 
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('game_session')
       .update({
         current_question_index: nextIndex,
@@ -169,15 +195,140 @@ export const useGameStore = create<GameState>((set, get) => ({
         ended_at: isLast ? new Date().toISOString() : null,
       })
       .eq('id', sessionId)
+      .eq('current_question_index', expectedCurrentIndex) // ← only succeeds if nothing else already advanced it
       .select()
-      .single();
+      .maybeSingle();
 
+    if (error) {
+      console.error('advanceQuestion error:', error);
+      return;
+    }
+
+    // If data is null, another call already advanced this session first — that's fine, ignore silently
     if (data) set({ currentSession: data });
   },
 
   endSession: async (sessionId: string) => {
     await supabase.from('game_session').update({ status: 'completed', ended_at: new Date().toISOString() }).eq('id', sessionId);
   },
+
+  findActiveSession: async (familyId, memberId) => {
+  const { data: participantRows } = await supabase
+    .from('game_participant').select('session_id').eq('member_id', memberId);
+  const sessionIds = (participantRows ?? []).map((p) => p.session_id);
+  if (sessionIds.length === 0) return null;
+
+  const { data } = await supabase
+    .from('game_session')
+    .select('*')
+    .in('id', sessionIds)
+    .eq('family_id', familyId)
+    .in('status', ['waiting', 'in_progress', 'paused'])
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  return data ?? null;
+},
+
+inviteAndStart: async (familyId, createdBy, memberId, gameType, invitedMemberIds, options) => {
+  set({ loading: true, error: null, dailyLimitReached: false });
+  try {
+    const { data, error } = await supabase.functions.invoke('generate-game-questions', {
+      body: { family_id: familyId, game_type: gameType, ...options },
+    });
+    if (error) {
+      const status = (error as any)?.context?.status;
+      if (status === 429) { set({ dailyLimitReached: true, loading: false }); return null; }
+      throw error;
+    }
+
+    const { data: session, error: sErr } = await supabase
+      .from('game_session')
+      .insert([{
+        family_id: familyId, game_type: gameType, mode: 'multiplayer',
+        question_ids: data.question_ids, created_by: createdBy,
+        status: 'waiting', invited_member_ids: invitedMemberIds,
+        lobby_deadline: new Date(Date.now() + 90000).toISOString(),
+      }])
+      .select().single();
+    if (sErr) throw sErr;
+
+    const { data: participant, error: pErr } = await supabase
+      .from('game_participant')
+      .insert([{ session_id: session.id, member_id: memberId }])
+      .select()
+      .single();
+    if (pErr) throw pErr;
+
+    const { data: questions } = await supabase.from('game_question').select('id, question, options, explanation').in('id', data.question_ids);
+    const ordered = data.question_ids.map((id: string) => questions?.find((q) => q.id === id)).filter(Boolean);
+
+    for (const invitedId of invitedMemberIds) {
+      await notifyAssignment({
+        familyId,
+        assigneeMemberId: invitedId,
+        type: 'family_update',
+        priority: 'important',
+        assigneeMessage: {
+          title: 'You\'ve been invited to play',
+          body: `You've been invited to join a ${gameType} game.`,
+        },
+        othersMessage: {
+          title: 'Game invitation sent',
+          body: `A family member has been invited to join a ${gameType} game.`,
+        },
+        actionLabel: 'Go to lobby',
+        actionRoute: `/(stack)/games/lobby?sessionId=${session.id}`,
+      });
+    }
+
+    set({
+      currentSession: session,
+      questions: ordered,
+      loading: false,
+      participants: [{ ...participant, member: undefined }],
+    });
+    return session;
+  } catch (error) {
+    set({ error: error instanceof Error ? error.message : 'Failed to start game', loading: false });
+    return null;
+  }
+},
+
+cancelSession: async (sessionId: string) => {
+  await supabase.from('game_session').update({ status: 'cancelled' }).eq('id', sessionId);
+},
+
+pauseSession: async (sessionId: string) => {
+  const { data } = await supabase
+    .from('game_session')
+    .update({ status: 'paused', paused_at: new Date().toISOString() })
+    .eq('id', sessionId).select().single();
+  if (data) set({ currentSession: data });
+},
+
+resumeSession: async (sessionId: string) => {
+  const session = get().currentSession;
+  if (!session?.paused_at || !session.question_started_at) return;
+
+  const pausedMs = Date.now() - new Date(session.paused_at).getTime();
+  const newStart = new Date(new Date(session.question_started_at).getTime() + pausedMs).toISOString();
+
+  const { data } = await supabase
+    .from('game_session')
+    .update({ status: 'in_progress', question_started_at: newStart, paused_at: null })
+    .eq('id', sessionId).select().single();
+  if (data) set({ currentSession: data });
+},
+
+refreshParticipants: async (sessionId: string) => {
+  const { data } = await supabase
+    .from('game_participant')
+    .select('*, member:member_id(name)')
+    .eq('session_id', sessionId);
+  if (data) set({ participants: data });
+},
 
   subscribeToSession: (sessionId: string) => {
     const existing = supabase.getChannels().find((ch) => ch.topic === `realtime:game-${sessionId}`);
@@ -198,6 +349,12 @@ export const useGameStore = create<GameState>((set, get) => ({
           if (data) set({ participants: data });
         }
       )
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'game_answer', filter: `session_id=eq.${sessionId}` },
+        () => {
+          // Just trigger a lightweight refetch signal — the screen's own effect (watching answer count) reacts
+          set((state) => ({ currentSession: state.currentSession ? { ...state.currentSession } : null }));
+        }
+      )
       .subscribe();
 
     set({ channel });
@@ -209,27 +366,28 @@ export const useGameStore = create<GameState>((set, get) => ({
     set({ channel: null });
   },
 
-  subscribeToInvites: (familyId: string, myUserId: string) => {
-    const topic = `game-invites-${familyId}`;
-    const existing = supabase.getChannels().find((ch) => ch.topic === `realtime:${topic}`);
-    if (existing) return;
+  // subscribeToInvites: (familyId: string, myUserId: string) => {
+  //   const topic = `game-invites-${familyId}`;
+  //   const existing = supabase.getChannels().find((ch) => ch.topic === `realtime:${topic}`);
+  //   if (existing) return;
 
-    const channel = supabase
-        .channel(topic)
-        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'game_session', filter: `family_id=eq.${familyId}` },
-        (payload) => {
-            const session = payload.new as GameSession;
-            if (session.mode !== 'multiplayer' || session.created_by === myUserId) return;
+  //   const channel = supabase
+  //       .channel(topic)
+  //       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'game_session', filter: `family_id=eq.${familyId}` },
+  //       (payload) => {
+  //           const session = payload.new as GameSession;
+  //           console.log("payload",payload)
+  //           if (session.mode !== 'multiplayer' || session.created_by === myUserId) return;
 
-            const { showToast } = useToastStore.getState();
-            showToast({
-            title: 'Family Game Started!',
-            body: `Someone started a ${GAME_META[session.game_type].label} game — join in!`,
-            variant: 'info',
-            actionRoute: `/(stack)/games/play?sessionId=${session.id}`,
-            });
-        }
-        )
-        .subscribe();
-    },
+  //           const { showToast } = useToastStore.getState();
+  //           showToast({
+  //             title: 'Family Game Started!',
+  //             body: `Someone started a ${GAME_META[session.game_type].label} game — join in!`,
+  //             variant: 'info',
+  //             actionRoute: `/(stack)/games/lobby?sessionId=${session.id}`, // ← was /games/play
+  //           });
+  //       }
+  //       )
+  //       .subscribe();
+  //   },
 }));

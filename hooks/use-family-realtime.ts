@@ -6,8 +6,12 @@ import { useMeetingStore } from '@/lib/stores/meeting-store';
 import { useStoriesStore } from '@/lib/stores/stories-store';
 import { useGroupChatStore } from '@/lib/stores/group-chat-store';
 import { useDmStore } from '@/lib/stores/dm-store';
+import { useGameStore } from '@/lib/stores/game-store';
+import { useFamilyStore } from '@/lib/stores/family-store';
+import { useGameInviteStore } from '@/lib/stores/game-invite-store';
 
 export function useFamilyRealtime(familyId: string | undefined, userId: string | undefined) {
+  const {currentMember} = useFamilyStore()
   const { subscribeToRealtime: subChores, unsubscribeFromRealtime: unsubChores } = useChoreStore();
   const { subscribeToRealtime: subCommitments, unsubscribeFromRealtime: unsubCommitments } = useCommitmentStore();
   const { subscribeToRealtime: subEvents, unsubscribeFromRealtime: unsubEvents } = useCalendarStore();
@@ -15,6 +19,7 @@ export function useFamilyRealtime(familyId: string | undefined, userId: string |
   const { subscribeToRealtime: subStories, unsubscribeFromRealtime: unsubStories } = useStoriesStore();
   const { subscribeToToasts: subGroupChatToasts, unsubscribeFromToasts: unsubGroupChatToasts } = useGroupChatStore();
   const { subscribeToToasts: subDmToasts, unsubscribeFromToasts: unsubDmToasts } = useDmStore();
+  const { subscribe: subGameInvites, unsubscribe: unsubGameInvites } = useGameInviteStore();
 
   useEffect(() => {
     if (!familyId || !userId) return;
@@ -26,6 +31,8 @@ export function useFamilyRealtime(familyId: string | undefined, userId: string |
     subStories(familyId);
     subGroupChatToasts(familyId, userId);
     subDmToasts(familyId, userId);
+    if(currentMember?.id) subGameInvites(familyId, currentMember?.id);
+
 
     return () => {
       unsubChores();
@@ -35,6 +42,7 @@ export function useFamilyRealtime(familyId: string | undefined, userId: string |
       unsubStories();
       unsubGroupChatToasts();
       unsubDmToasts();
+      unsubGameInvites();
     };
-  }, [familyId, userId]);
+  }, [familyId, userId, currentMember]);
 }
