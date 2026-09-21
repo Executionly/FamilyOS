@@ -26,6 +26,8 @@ import { CoachmarkTarget } from '../coachmark/coachmark-target';
 import { FamilyChallengeCard } from '../family-challenge-card';
 import { GameSession, useGameStore } from '@/lib/stores/game-store';
 import { GAME_META } from '@/constants/games';
+import { useSubscriptionStore } from '@/lib/stores/subscription-store';
+import { ExpiredSubscriptionCard } from '../ExpiredSubscriptionCard';
 
 // ── Brand palette ────────────────────────────────────────────
 const NAVY = '#044768';
@@ -157,6 +159,8 @@ export default function AdminDashboard() {
   const memberName = (id?: string | null) => members?.find((m) => m.id === id)?.name ?? null;
 
   const isPremium = family?.subscription_tier === 'premium';
+  const { tier, expiresAt } = useSubscriptionStore();
+  const [subStatus, setSubStatus] = useState<string | null>(null);
 
   const handleFetch = () => {
     if (!family?.id) return;
@@ -184,6 +188,15 @@ export default function AdminDashboard() {
       findActiveSession(family.id, currentMember.id).then(setActiveGame);
     }
   }, [family?.id, currentMember?.id]);
+
+  useEffect(() => {
+    if (family?.id) {
+      supabase.from('family').select('subscription_status').eq('id', family.id).single()
+        .then(({ data }) => setSubStatus(data?.subscription_status ?? null));
+    }
+  }, [family?.id]);
+
+  const showExpiredCard = subStatus === 'expired' && tier === 'free';
 
   const handleTourFinish = async () => {
     if (!currentMember?.id) return;
@@ -394,6 +407,39 @@ export default function AdminDashboard() {
                 </View>
               </CoachmarkTarget>
 
+              {showExpiredCard && <ExpiredSubscriptionCard />}
+              {/* ── Premium upsell — slim, only on free plan ────── */}
+              {!isPremium && !showExpiredCard && (
+                <CoachmarkTarget id="premium-upsell" order={3} title="Unlock more with Premium" description="Get AI meeting agendas, unlimited members, and more whenever you're ready.">
+                  <Pressable
+                    onPress={() => router.push('/(stack)/paywall')}
+                    style={{
+                      backgroundColor: NAVY,
+                      borderRadius: 18,
+                      padding: 18,
+                      marginBottom: 16,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 14,
+                    }}
+                  >
+                    <View style={{
+                      width: 42, height: 42, borderRadius: 12, backgroundColor: CORAL,
+                      alignItems: 'center', justifyContent: 'center',
+                    }}>
+                      <Ionicons name="sparkles" size={20} color="#fff" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ color: '#fff', fontSize: 14, fontWeight: '700' }}>Go Premium</Text>
+                      <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12, marginTop: 2 }}>
+                        Unlock AI meeting agendas, unlimited members, and more.
+                      </Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={18} color="#fff" />
+                  </Pressable>
+                </CoachmarkTarget>
+              )}
+
               {/* ── Family Snapshot (progress + counts, one card) ── */}
               <CoachmarkTarget id="snapshot" order={3} title="Family Snapshot" description="A quick read on commitments, chores, and meetings — how your family is trending.">
                 <View style={{
@@ -476,11 +522,6 @@ export default function AdminDashboard() {
                 </View>
               )}
 
-              {/* ── Family Challenge ──────────────────────────── */}
-              <CoachmarkTarget id="challenge" order={4} title="Family Challenges" description="A fun, values-based challenge for your family to take on together.">
-                <FamilyChallengeCard />
-              </CoachmarkTarget>
-
               {/* ── Active game (only if one exists) ──────────── */}
               {activeGame && (
                 <Pressable
@@ -501,26 +542,10 @@ export default function AdminDashboard() {
                   <Ionicons name="chevron-forward" size={16} color={colors.primary} />
                 </Pressable>
               )}
-
-              {/* ── Premium upsell — slim, only on free plan ────── */}
-              {!isPremium && (
-                <CoachmarkTarget id="premium-upsell" order={5} title="Unlock more with Premium" description="Get AI meeting agendas, unlimited members, and more whenever you're ready.">
-                  <Pressable
-                    onPress={() => router.push('/(stack)/paywall')}
-                    style={{
-                      backgroundColor: '#fff', borderRadius: 16, borderWidth: 1, borderColor: CORAL,
-                      paddingVertical: 12, paddingHorizontal: 16, marginBottom: 16,
-                      flexDirection: 'row', alignItems: 'center', gap: 10,
-                    }}
-                  >
-                    <Ionicons name="sparkles" size={16} color={CORAL} />
-                    <Text style={{ flex: 1, fontSize: 12, color: INK, fontWeight: '600' }}>
-                      Unlock AI agendas, unlimited members & more
-                    </Text>
-                    <Ionicons name="chevron-forward" size={16} color={CORAL} />
-                  </Pressable>
-                </CoachmarkTarget>
-              )}
+              {/* ── Family Challenge ──────────────────────────── */}
+              <CoachmarkTarget id="challenge" order={4} title="Family Challenges" description="A fun, values-based challenge for your family to take on together.">
+                <FamilyChallengeCard />
+              </CoachmarkTarget>
             </View>
 
             {/* ── Quick Actions ────────────────────────────────── */}

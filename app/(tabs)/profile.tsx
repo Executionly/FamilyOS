@@ -11,6 +11,9 @@ import { TierBadge } from '@/components/ui/tier-badge';
 import { UpgradePrompt } from '@/components/upgrade-prompt';
 import { DeleteAccountModal } from '@/components/modals/delete-account-modal';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useSubscriptionStore } from '@/lib/stores/subscription-store';
+import { supabase } from '@/lib/_core/supabase';
+import { ExpiredSubscriptionCard } from '@/components/ExpiredSubscriptionCard';
 
 type MenuItem = {
   icon: keyof typeof Ionicons.glyphMap;
@@ -40,6 +43,8 @@ export default function ProfileScreen() {
 
   const isPremium = family?.subscription_tier === 'premium';
   const isAdmin = isAdminAccess(currentMember?.role)
+  const { tier, expiresAt } = useSubscriptionStore();
+  const [subStatus, setSubStatus] = useState<string | null>(null);
 
   const MENU_ITEMS: MenuItem[] = [
     { icon: 'people-outline', label: 'Family Members', description: 'Add, invite, and manage everyone in your family', route: '/(stack)/member-list', open: true, premium: true },
@@ -84,6 +89,15 @@ export default function ProfileScreen() {
     };
     resolveFamilyPhoto();
   }, [family?.photo_url]);
+
+  useEffect(() => {
+    if (family?.id) {
+      supabase.from('family').select('subscription_status').eq('id', family.id).single()
+        .then(({ data }) => setSubStatus(data?.subscription_status ?? null));
+    }
+  }, [family?.id]);
+
+  const showExpiredCard = subStatus === 'expired' && tier === 'free';
 
   const openPremiumModal = () => {
     setUpgradePromptVisible(true)
@@ -169,7 +183,10 @@ return (
         </View>
 
         {/* Upgrade CTA — free tier only, prominent placement right below identity */}
-        {!isPremium && (
+        <View className='px-4 mt-3'>
+          {showExpiredCard && <ExpiredSubscriptionCard />}
+        </View>
+        {!isPremium && !showExpiredCard && (
           <View className="mt-4 px-4">
             <Pressable onPress={() => router.push('/(stack)/paywall')}>
               <LinearGradient
@@ -204,7 +221,7 @@ return (
         )}
 
         {/* Account section */}
-        <View className="mt-7 px-4">
+        <View className="mt-5 px-4">
           <Text className="mb-2 px-1 text-[11px] font-bold tracking-[1.5px] text-muted">ACCOUNT</Text>
           <View
             className="overflow-hidden rounded-2xl"

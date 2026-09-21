@@ -1,4 +1,4 @@
-import { ScrollView, Text, View, Pressable, ActivityIndicator, FlatList, Image, RefreshControl } from 'react-native';
+import { ScrollView, Text, View, Pressable, ActivityIndicator, FlatList, Image, RefreshControl, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ScreenContainer } from '@/components/screen-container';
@@ -184,14 +184,14 @@ export default function LegacyScreen() {
                   <Text className="text-xs text-muted text-center leading-relaxed mb-6 px-4">
                     Every family has a story. Begin preserving yours by archiving meaningful photos into the vault.
                   </Text>
-                  <Pressable
+                  <TouchableOpacity
                     onPress={handleAddMemory}
-                    style={({ pressed }) => [{ backgroundColor: colors.primary, opacity: pressed ? 0.9 : 1 }]}
+                    style={ [{ backgroundColor: colors.primary }]}
                     className="px-6 py-4 rounded-2xl flex-row items-center shadow-xs"
                   >
                     <Ionicons name="cloud-upload" size={16} color="#fff" style={{ marginRight: 6 }} />
                     <Text className="text-white text-xs font-bold">Upload to Vault</Text>
-                  </Pressable>
+                  </TouchableOpacity>
                 </View>
               ) : (
                 <FlatList
@@ -260,14 +260,14 @@ export default function LegacyScreen() {
                   <Text className="text-xs text-muted text-center leading-relaxed mb-6 px-4">
                     Record oral histories, heritage facts, and recipes to hand down generations.
                   </Text>
-                  <Pressable
+                  <TouchableOpacity
                     onPress={handleAddStory}
-                    style={({ pressed }) => [{ backgroundColor: colors.primary, opacity: pressed ? 0.9 : 1 }]}
+                    style={[{ backgroundColor: colors.primary, }]}
                     className="px-6 py-4 rounded-2xl flex-row items-center shadow-xs"
                   >
                     <Ionicons name="create-outline" size={16} color="#fff" style={{ marginRight: 6 }} />
                     <Text className="text-white text-xs font-bold">Write First Story</Text>
-                  </Pressable>
+                  </TouchableOpacity>
                 </View>
               ) : (
                 <FlatList

@@ -10,6 +10,7 @@ import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { isAdminAccess } from '@/utils';
 import * as WebBrowser from "expo-web-browser";
 import { LinearGradient } from 'expo-linear-gradient';
+import LinearButton from '@/components/ui/LinearButton';
 
 const CARD_SHADOW = {
   shadowColor: '#000',
@@ -514,23 +515,11 @@ export default function MeetingsScreen() {
 
       {meetings?.length > 0 && isEditor && (
         <View style={{ borderTopColor: colors.border }} className="px-5 pt-3 pb-4 border-t">
-          <Pressable onPress={handleStartMeeting}>
-            {({ pressed }) => (
-              <View style={[CTA_SHADOW, { opacity: pressed ? 0.9 : 1, borderRadius: 18 }]} className="overflow-hidden">
-                <LinearGradient
-                  colors={[colors.primary, colors.primary + 'CC']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  
-                >
-                  <View className="py-4 items-center flex-row justify-center">
-                    <Ionicons name="add-circle-outline" size={18} color={colors.background} style={{ marginRight: 8 }} />
-                    <Text className="text-background font-bold text-base">Start New Meeting</Text>
-                  </View>
-                </LinearGradient>
-              </View>
-            )}
-          </Pressable>
+          <LinearButton
+            title='Start New Meeting'
+            onPress={handleStartMeeting}
+            icon='add-circle-outline'
+            />
         </View>
       )}
     </ScreenContainer>

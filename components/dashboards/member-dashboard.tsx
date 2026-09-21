@@ -23,9 +23,12 @@ import { FamilyChallengeCard } from '../family-challenge-card';
 import { GameSession, useGameStore } from '@/lib/stores/game-store';
 import { GAME_META } from '@/constants/games';
 import { useColors } from '@/hooks/use-colors';
+import { ExpiredSubscriptionCard } from '../ExpiredSubscriptionCard';
+import { useSubscriptionStore } from '@/lib/stores/subscription-store';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-
+const NAVY = '#044768';
+const CORAL = '#FE6A50';
 // ── Section header ────────────────────────────────────────────
 
 function SectionHeader({ title, action, onAction }: { title: string; action?: string; onAction?: () => void }) {
@@ -74,6 +77,9 @@ export function MemberDashboard() {
   const [loading, setLoading] = useState(true);
   const { findActiveSession } = useGameStore();
   const [activeGame, setActiveGame] = useState<GameSession | null>(null);
+  const { tier, expiresAt } = useSubscriptionStore();
+  const [subStatus, setSubStatus] = useState<string | null>(null);
+  const isPremium = family?.subscription_tier === 'premium';
 
   const handleFetch = () => {
     if (!family?.id) return;
@@ -101,6 +107,15 @@ export function MemberDashboard() {
       findActiveSession(family.id, currentMember.id).then(setActiveGame);
     }
   }, [family?.id, currentMember?.id]);
+
+  useEffect(() => {
+    if (family?.id) {
+      supabase.from('family').select('subscription_status').eq('id', family.id).single()
+        .then(({ data }) => setSubStatus(data?.subscription_status ?? null));
+    }
+  }, [family?.id]);
+  
+    const showExpiredCard = subStatus === 'expired' && tier === 'free';
 
   const handleTourFinish = async () => {
     if (!currentMember?.id) return;
@@ -265,6 +280,39 @@ export function MemberDashboard() {
                     No pending chores or commitments.
                   </Text>
                 </View>
+              )}
+
+              {showExpiredCard && <ExpiredSubscriptionCard />}
+              {/* ── Premium upsell — slim, only on free plan ────── */}
+              {!isPremium && !showExpiredCard && (
+                <CoachmarkTarget id="premium-upsell" order={3} title="Unlock more with Premium" description="Get AI meeting agendas, unlimited members, and more whenever you're ready.">
+                  <Pressable
+                    onPress={() => router.push('/(stack)/paywall')}
+                    style={{
+                      backgroundColor: NAVY,
+                      borderRadius: 18,
+                      padding: 18,
+                      marginBottom: 16,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 14,
+                    }}
+                  >
+                    <View style={{
+                      width: 42, height: 42, borderRadius: 12, backgroundColor: CORAL,
+                      alignItems: 'center', justifyContent: 'center',
+                    }}>
+                      <Ionicons name="sparkles" size={20} color="#fff" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ color: '#fff', fontSize: 14, fontWeight: '700' }}>Go Premium</Text>
+                      <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12, marginTop: 2 }}>
+                        Unlock AI meeting agendas, unlimited members, and more.
+                      </Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={18} color="#fff" />
+                  </Pressable>
+                </CoachmarkTarget>
               )}
 
               {activeGame && (

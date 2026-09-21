@@ -8,6 +8,7 @@ import { useCharterStore } from '@/lib/stores/charter-store';
 import { useFamilyStore } from '@/lib/stores/family-store';
 import { useColors } from '@/hooks/use-colors';
 import { isAdminAccess } from '@/utils';
+import LinearButton from '@/components/ui/LinearButton';
 
 const SHADOW = {
   shadowColor: '#000',
@@ -401,34 +402,11 @@ export default function FoundationBuilderScreen() {
 
               {/* Start Button */}
               {isEditor && (
-                <Pressable onPress={handleStartCharter}>
-                  {({ pressed }) => (
-                    <View style={[SHADOW, { opacity: pressed ? 0.9 : 1, borderRadius: 18 }]} className="overflow-hidden">
-                      <LinearGradient
-                        colors={[colors.primary, colors.primary + 'CC']}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 0 }}
-                        className="py-4 items-center flex-row justify-center"
-                      >
-                        <Ionicons
-                          name="rocket-outline"
-                          size={18}
-                          color={colors.background}
-                          style={{ marginRight: 8 }}
-                        />
-                        <Text className="text-base font-bold text-background">
-                          Start Building Charter
-                        </Text>
-                        <Ionicons
-                          name="arrow-forward"
-                          size={16}
-                          color={colors.background}
-                          style={{ marginLeft: 8 }}
-                        />
-                      </LinearGradient>
-                    </View>
-                  )}
-                </Pressable>
+                <LinearButton
+                  title='Start Building Charter'
+                  onPress={handleStartCharter}
+                  icon='rocket-outline'
+                  />
               )}
 
               {!isEditor && (

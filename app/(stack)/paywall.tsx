@@ -9,6 +9,7 @@ import { getOfferings, initPurchases, purchasePackage, restorePurchases } from '
 import { useSubscriptionStore } from '@/lib/stores/subscription-store';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { PlanComparisonTable } from '@/components/plan-comparison-table';
+import { supabase } from '@/lib/_core/supabase';
 
 const FEATURES = [
   { icon: 'sparkles', text: 'AI Family Assistant that manages your calendar, tasks & more' },
@@ -34,6 +35,14 @@ export default function PaywallScreen() {
   const [error, setError] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
   const [initDone, setInitDone] = useState(false);
+  const [wasExpired, setWasExpired] = useState(false);
+
+  useEffect(() => {
+    if (family?.id) {
+      supabase.from('family').select('subscription_status').eq('id', family.id).single()
+        .then(({ data }) => setWasExpired(data?.subscription_status === 'expired'));
+    }
+  }, [family?.id]);
 
   useEffect(() => {
     (async () => {
@@ -170,10 +179,12 @@ export default function PaywallScreen() {
             <Ionicons name="sparkles" size={28} color={colors.primary} />
           </View>
           <Text className="text-center text-2xl font-extrabold text-foreground">
-            Unlock Your Family's Intelligence Layer
+            {wasExpired ? 'Renew Your Premium' : "Unlock Your Family's Intelligence Layer"}
           </Text>
           <Text className="mt-2 text-center text-sm text-muted">
-            AI-powered guidance, deeper insights, and tools to help your family grow together.
+            {wasExpired
+            ? 'Your subscription has ended. Renew to get back everything Premium unlocks.'
+            : 'AI-powered guidance, deeper insights, and tools to help your family grow together.'}
           </Text>
         </View>
 

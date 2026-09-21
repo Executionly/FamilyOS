@@ -32,6 +32,7 @@ export default function GamesHubScreen() {
   const [activeSession, setActiveSession] = useState<GameSession | null>(null);
   const { members } = useFamilyStore();
   const { findActiveSession, inviteAndStart } = useGameStore();
+  const isPremium = family?.subscription_tier === 'premium';
 
   useEffect(() => {
     if (family?.id && currentMember?.id) {
@@ -97,7 +98,7 @@ export default function GamesHubScreen() {
             </View>
 
             {/* Premium Pill */}
-            <Pressable
+            {!isPremium && <Pressable
               onPress={() => router.push('/(stack)/paywall')}
               style={{ backgroundColor: 'rgba(255,255,255,0.2)' }}
               className="flex-row items-center rounded-full px-2.5 py-1"
@@ -106,7 +107,7 @@ export default function GamesHubScreen() {
               <Text className="ml-1 text-[9px] font-black text-white uppercase tracking-wider">
                 Go Premium
               </Text>
-            </Pressable>
+            </Pressable>}
           </View>
 
           <Text className="text-xl font-black text-white mb-1">Ready to play?</Text>
@@ -115,7 +116,7 @@ export default function GamesHubScreen() {
           </Text>
 
           {/* Inline Premium Banner Trigger (Keeps card compact and beautiful) */}
-          <Pressable
+          {!isPremium && <Pressable
             onPress={() => router.push('/(stack)/paywall')}
             style={{ backgroundColor: 'rgba(0,0,0,0.15)' }}
             className="flex-row items-center justify-between rounded-xl px-3.5 py-2"
@@ -127,7 +128,7 @@ export default function GamesHubScreen() {
               </Text>
             </View>
             <Ionicons name="arrow-forward" size={12} color="#fff" />
-          </Pressable>
+          </Pressable>}
         </View>
 
         {/* DAILY LIMIT WARNING */}
