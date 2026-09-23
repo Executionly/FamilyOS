@@ -22,12 +22,12 @@ export default function TabLayout() {
   const { family } = useFamilyStore();
   const { user } = useAuthStore();
 
-  useEffect(() => {
-    if (family?.id) {
-      initPurchases(family.id);
-      useSubscriptionStore.getState().fetchSubscription(family.id);
-    }
-  }, [family?.id]);
+  // useEffect(() => {
+  //   if (family?.id) {
+  //     initPurchases(family.id);
+  //     useSubscriptionStore.getState().fetchSubscription(family.id);
+  //   }
+  // }, [family?.id]);
 
   useFamilyRealtime(family?.id, user?.id);
 

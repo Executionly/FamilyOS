@@ -24,6 +24,10 @@ module.exports = {
     bundleIdentifier: env.iosBundleId,
     infoPlist: {
       ITSAppUsesNonExemptEncryption: false,
+      NSCameraUsageDescription:
+      "Fambound uses your camera to take photos for your family profile or to share photos with your family.",
+      NSPhotoLibraryUsageDescription:
+      "Fambound uses your photo library to select photos for your family profile or to share photos with your family.",
     },
   },
   android: {

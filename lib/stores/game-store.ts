@@ -134,7 +134,37 @@ export const useGameStore = create<GameState>((set, get) => ({
     }
   },
 
+  // startFamilyQuiz: async (familyId: string, createdBy: string, memberId: string, mode: 'solo' | 'multiplayer') => {
+  //   set({ loading: true, error: null });
+  //   try {
+  //     const { data, error } = await supabase.functions.invoke('generate-family-quiz', { body: { family_id: familyId } });
+  //     if (error) {
+  //       const status = (error as any)?.context?.status;
+  //       if (status === 422) { set({ error: 'Set up your Family Charter first to unlock this quiz.', loading: false }); return null; }
+  //       throw error;
+  //     }
+
+  //     const questionIds = data.question_ids;
+  //     const { data: session, error: sErr } = await supabase
+  //       .from('game_session')
+  //       .insert([{ family_id: familyId, game_type: 'quiz', mode, question_ids: questionIds, created_by: createdBy, status: mode === 'multiplayer' ? 'waiting' : 'in_progress', question_started_at: mode === 'multiplayer' ? null : new Date().toISOString() }])
+  //       .select().single();
+  //     if (sErr) throw sErr;
+
+  //     await supabase.from('game_participant').insert([{ session_id: session.id, member_id: memberId }]);
+  //     const { data: questions } = await supabase.from('game_question').select('id, question, options, explanation').in('id', questionIds);
+  //     const ordered = questionIds.map((id: string) => questions?.find((q: any) => q.id === id)).filter(Boolean);
+
+  //     set({ currentSession: session, questions: ordered, loading: false });
+  //     return session;
+  //   } catch (error) {
+  //     set({ error: error instanceof Error ? error.message : 'Failed to start family quiz', loading: false });
+  //     return null;
+  //   }
+  // },
+
   // New — host taps "Start" in the lobby, this kicks the game off for everyone at once
+  
   beginMultiplayerGame: async (sessionId: string) => {
     const { data, error } = await supabase
       .from('game_session')
