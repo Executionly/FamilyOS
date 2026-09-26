@@ -25,6 +25,7 @@ import { GAME_META } from '@/constants/games';
 import { useColors } from '@/hooks/use-colors';
 import { ExpiredSubscriptionCard } from '../ExpiredSubscriptionCard';
 import { useSubscriptionStore } from '@/lib/stores/subscription-store';
+import KnowYourFamilyCard from '../KnowYourFamilyCard';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const NAVY = '#044768';
@@ -282,6 +283,8 @@ export function MemberDashboard() {
                 </View>
               )}
 
+              <KnowYourFamilyCard/>
+              
               {showExpiredCard && <ExpiredSubscriptionCard />}
               {/* ── Premium upsell — slim, only on free plan ────── */}
               {!isPremium && !showExpiredCard && (

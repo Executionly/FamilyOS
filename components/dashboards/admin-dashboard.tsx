@@ -28,6 +28,7 @@ import { GameSession, useGameStore } from '@/lib/stores/game-store';
 import { GAME_META } from '@/constants/games';
 import { useSubscriptionStore } from '@/lib/stores/subscription-store';
 import { ExpiredSubscriptionCard } from '../ExpiredSubscriptionCard';
+import KnowYourFamilyCard from '../KnowYourFamilyCard';
 
 // ── Brand palette ────────────────────────────────────────────
 const NAVY = '#044768';
@@ -406,6 +407,7 @@ export default function AdminDashboard() {
                   )}
                 </View>
               </CoachmarkTarget>
+              <KnowYourFamilyCard/>
 
               {showExpiredCard && <ExpiredSubscriptionCard />}
               {/* ── Premium upsell — slim, only on free plan ────── */}

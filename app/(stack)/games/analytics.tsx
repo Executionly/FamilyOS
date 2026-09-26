@@ -38,7 +38,8 @@ export default function GameAnalyticsScreen() {
         .from('game_session')
         .select('id, game_type')
         .eq('family_id', family.id)
-        .eq('status', 'completed');
+        .eq('status', 'completed')
+        .eq('mode', 'multiplayer');
       if (gameFilter !== 'all') sessionQuery = sessionQuery.eq('game_type', gameFilter);
 
       const { data: sessions } = await sessionQuery;

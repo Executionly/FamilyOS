@@ -44,11 +44,14 @@ export function PlanComparisonTable({
     { label: 'Family Calendar', free: true, premium: true },
     { label: 'Family Meetings', free: true, premium: true },
     { label: 'Family Foundation', free: true, premium: true },
+    { label: 'Family Games', free: '5 plays/day', premium: 'Unlimited' },
+    { label: 'Family Challenges', free: 'Template only', premium: 'AI-personalized' },
+    { label: 'Know Your Family Dynamics', free: 'Basic profile', premium: 'Full AI report' },
     { label: 'Family Meals Planner', free: false, premium: true },
     { label: 'Memories', free: true, premium: 'Unlimited' },
     { label: 'Advanced AI recommendations', free: 'Limited', premium: true },
     { label: 'Family planning', free: 'Basic', premium: 'Advanced' },
-    { label: 'Family growth insights', free: 'Basic', premium: true },
+    // { label: 'Family growth insights', free: 'Basic', premium: true },
     { label: 'Legacy features', free: 'Basic', premium: 'Advanced' },
   ];
 

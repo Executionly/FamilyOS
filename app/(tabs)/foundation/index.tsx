@@ -171,6 +171,45 @@ export default function FoundationBuilderScreen() {
             </LinearGradient>
           </View>
 
+          {/* Family Dynamics shortcut */}
+          <Pressable
+            onPress={() => router.push('/(stack)/family-dynamics')}
+            style={[
+              {
+                backgroundColor: colors.surface,
+                borderColor: colors.border,
+              },
+            ]}
+            className="mb-6 flex-row items-center rounded-2xl border px-4 py-3.5"
+          >
+            <View
+              style={{ backgroundColor: `${colors.primary}14` }}
+              className="mr-3 h-10 w-10 items-center justify-center rounded-xl"
+            >
+              <Ionicons
+                name="people-outline"
+                size={20}
+                color={colors.primary}
+              />
+            </View>
+
+            <View className="flex-1">
+              <Text className="text-sm font-bold text-foreground">
+                Explore Family Dynamics
+              </Text>
+
+              <Text className="mt-0.5 text-xs text-muted">
+                See how your family’s strengths fit together
+              </Text>
+            </View>
+
+            <Ionicons
+              name="chevron-forward"
+              size={18}
+              color={colors.muted}
+            />
+          </Pressable>
+
           {charter ? (
             // Charter exists
             <>

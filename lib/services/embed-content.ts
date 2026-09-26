@@ -1,7 +1,21 @@
 import { supabase } from "../_core/supabase";
 
 
-type SourceType = 'charter' | 'meeting' | 'story' | 'memory' | 'commitment' | 'event' | 'timeline_event' | 'chore' | 'member' | 'meal' | 'meal_plan' | 'challenge';
+type SourceType = 
+'charter' 
+| 'meeting' 
+| 'story' 
+| 'memory' 
+| 'commitment' 
+| 'event' 
+| 'timeline_event' 
+| 'chore' 
+| 'member' 
+| 'meal' 
+| 'meal_plan' 
+| 'member_profile' 
+| 'family_intelligence' 
+| 'challenge';
 
 export async function embedContent(params: {
   family_id: string;

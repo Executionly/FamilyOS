@@ -9,6 +9,11 @@ import { ScreenContainer } from '@/components/screen-container';
 import { AppHeader } from '@/components/app-header';
 import { isAdminAccess } from '@/utils';
 import { Image } from 'react-native';
+import {
+  PRODUCTIVITY_ENERGY_CONTENT,
+  TEMPERAMENT_CONTENT,
+} from '@/lib/result-content';
+import { ProductivityEnergy, TemperamentType } from '@/types';
 
 const NO_CODE_AGE_BANDS = ['toddler', 'child', 'preteen'];
 
@@ -186,155 +191,400 @@ export default function MembersScreen() {
             const isMe = item.user_id === currentMember?.user_id;
             const age = getAge(item.date_of_birth);
 
+            const temperament = item.temperament_type
+              ? TEMPERAMENT_CONTENT[item.temperament_type as TemperamentType]
+              : null;
+
+            const productivityEnergy = item.productivity_energy
+              ? PRODUCTIVITY_ENERGY_CONTENT[
+                  item.productivity_energy as ProductivityEnergy
+                ]
+              : null;
+
             return (
               <Pressable
-                onPress={() => router.push(`/(stack)/member-profile?id=${item.id}`)}
-                style={({ pressed }) => ({
+                onPress={() =>
+                  router.push(`/(stack)/member-profile?id=${item.id}`)
+                }
+                style={({
                   backgroundColor: colors.surface,
-                  // borderColor: colors.,
-                  opacity: pressed ? 0.85 : 1,
+                  transform: [{ scale: 1 }],
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 5 },
+                  shadowOpacity: 0.06,
+                  shadowRadius: 12,
+                  elevation: 2,
                 })}
-                className="p-5 rounded-3xl mb-4 border border-gray-200 shadow-xs"
+                className="mb-4 overflow-hidden rounded-[24px] border border-gray-200"
               >
-                <View className="flex-row items-center">
-                  {/* Avatar Column */}
+                {/* Member header */}
+                <View className="flex-row items-center px-4 pb-3.5 pt-4">
                   {item.avatar_url ? (
-                    <MemberAvatar member={item} colors={colors}/>
+                    <MemberAvatar member={item} colors={colors} />
                   ) : (
                     <View
-                      className="w-12 h-12 rounded-full items-center justify-center mr-3 overflow-hidden border-2"
-                      style={{ backgroundColor: colors.primary + '15', borderColor: colors.primary + '30' }}
+                      style={{
+                        backgroundColor: `${colors.primary}14`,
+                        borderColor: `${colors.primary}30`,
+                      }}
+                      className="mr-3 h-14 w-14 items-center justify-center overflow-hidden rounded-2xl border"
                     >
-                      <Text className="text-sm font-black text-primary">{getInitials(item.name)}</Text>
+                      <Text
+                        style={{ color: colors.primary }}
+                        className="text-base font-black"
+                      >
+                        {getInitials(item.name)}
+                      </Text>
                     </View>
                   )}
 
-                  {/* Info Column */}
-                  <View className="flex-1">
-                    <View className="flex-row items-center justify-between">
-                      <Text className="text-base font-black text-foreground" numberOfLines={1}>
-                        {item.name} {isMe && '(You)'}
+                  <View className="flex-1 pr-3">
+                    <View className="flex-row items-center">
+                      <Text
+                        numberOfLines={1}
+                        className="flex-1 text-base font-black text-foreground"
+                      >
+                        {item.name}
+                        {isMe ? ' (You)' : ''}
                       </Text>
-                      
-                      <View style={{ backgroundColor: `${colors.primary}10` }} className="px-2.5 py-1 rounded-lg">
-                        <Text style={{ color: colors.primary }} className="text-[10px] font-extrabold capitalize tracking-wider">{item.role}</Text>
+
+                      <View
+                        style={{ backgroundColor: `${colors.primary}12` }}
+                        className="ml-2 rounded-full px-2.5 py-1"
+                      >
+                        <Text
+                          style={{ color: colors.primary }}
+                          className="text-[9px] font-black uppercase tracking-wider"
+                        >
+                          {item.role}
+                        </Text>
                       </View>
                     </View>
+
                     {(age !== null || item.age_band) && (
-                      <Text className="text-xs text-muted mt-1 font-semibold capitalize">
+                      <Text className="mt-1 text-xs font-medium capitalize text-muted">
                         {age !== null ? `${age} yrs old` : item.age_band}
                       </Text>
                     )}
                   </View>
 
-                  <Ionicons name="chevron-forward" size={16} color={colors.muted} style={{ marginLeft: 12 }} />
+                  <Ionicons
+                    name="chevron-forward"
+                    size={17}
+                    color={colors.muted}
+                  />
                 </View>
 
-                {/* Tags and Custom Status Badges */}
-                <View className="flex-row items-center gap-2 flex-wrap mt-2.5">
+                {/* Assessment intelligence */}
+                <View
+                  style={{
+                    backgroundColor: `${colors.primary}06`,
+                    borderTopColor: colors.border,
+                    borderBottomColor: colors.border,
+                  }}
+                  className="border-b border-t px-4 py-3"
+                >
+                  <View className="mb-2 flex-row items-center justify-between">
+                    <Text className="text-[9px] font-black uppercase tracking-[1.4px] text-muted">
+                      Personal profile
+                    </Text>
+
+                    <View className="flex-row items-center">
+                      <Ionicons
+                        name={
+                          item.assessment_completed
+                            ? 'checkmark-circle'
+                            : 'ellipse-outline'
+                        }
+                        size={13}
+                        color={
+                          item.assessment_completed
+                            ? '#10B981'
+                            : colors.muted
+                        }
+                      />
+
+                      <Text
+                        style={{
+                          color: item.assessment_completed
+                            ? '#10B981'
+                            : colors.muted,
+                        }}
+                        className="ml-1 text-[9px] font-black uppercase tracking-wider"
+                      >
+                        {item.assessment_completed
+                          ? 'Assessment complete'
+                          : 'Assessment pending'}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View className="flex-row gap-2">
+                    <ProfileInsight
+                      icon="compass-outline"
+                      label="Temperament"
+                      value={temperament?.label ?? 'Not completed'}
+                      colors={colors}
+                    />
+
+                    <ProfileInsight
+                      icon="flash-outline"
+                      label="Energy"
+                      value={productivityEnergy?.label ?? 'Not completed'}
+                      colors={colors}
+                    />
+                  </View>
+                </View>
+
+                {/* Membership status */}
+                <View className="flex-row flex-wrap items-center gap-2 px-4 pb-3.5 pt-3">
                   {isManaged ? (
-                    <View style={{ backgroundColor: `${colors.muted}15` }} className="flex-row items-center px-2.5 py-1.5 rounded-xl border border-border/40">
-                      <Ionicons name="lock-closed" size={11} color={colors.muted} />
-                      <Text className="text-[10px] font-bold text-muted ml-1 uppercase">Managed Profile</Text>
+                    <View
+                      style={{
+                        backgroundColor: `${colors.muted}12`,
+                        borderColor: `${colors.muted}25`,
+                      }}
+                      className="flex-row items-center rounded-full border px-2.5 py-1.5"
+                    >
+                      <Ionicons
+                        name="lock-closed"
+                        size={11}
+                        color={colors.muted}
+                      />
+
+                      <Text className="ml-1.5 text-[9px] font-black uppercase tracking-wider text-muted">
+                        Managed profile
+                      </Text>
                     </View>
                   ) : isClaimed ? (
-                    <View style={{ backgroundColor: '#10B98110', borderColor: '#10B98130' }} className="flex-row items-center px-2.5 py-1.5 rounded-xl border">
-                      <Ionicons name="checkmark-circle" size={11} color="#10B981" />
-                      <Text className="text-[10px] font-black text-emerald-600 ml-1 uppercase">Joined</Text>
+                    <View
+                      style={{
+                        backgroundColor: '#10B98110',
+                        borderColor: '#10B98130',
+                      }}
+                      className="flex-row items-center rounded-full border px-2.5 py-1.5"
+                    >
+                      <Ionicons
+                        name="checkmark-circle"
+                        size={11}
+                        color="#10B981"
+                      />
+
+                      <Text className="ml-1.5 text-[9px] font-black uppercase tracking-wider text-emerald-600">
+                        Joined
+                      </Text>
                     </View>
                   ) : (
-                    <View style={{ backgroundColor: '#F59E0B10', borderColor: '#F59E0B30' }} className="flex-row items-center px-2.5 py-1.5 rounded-xl border">
+                    <View
+                      style={{
+                        backgroundColor: '#F59E0B10',
+                        borderColor: '#F59E0B30',
+                      }}
+                      className="flex-row items-center rounded-full border px-2.5 py-1.5"
+                    >
                       <Ionicons name="mail" size={11} color="#F59E0B" />
-                      <Text className="text-[10px] font-black text-amber-600 ml-1 uppercase">Invited</Text>
+
+                      <Text className="ml-1.5 text-[9px] font-black uppercase tracking-wider text-amber-600">
+                        Invited
+                      </Text>
                     </View>
                   )}
 
                   {item.is_founding_admin && (
-                    <View style={{ backgroundColor: '#D9770615' }} className="flex-row items-center rounded-xl px-2.5 py-1.5">
+                    <View
+                      style={{
+                        backgroundColor: '#D9770615',
+                        borderColor: '#D9770630',
+                      }}
+                      className="flex-row items-center rounded-full border px-2.5 py-1.5"
+                    >
                       <Ionicons name="star" size={11} color="#D97706" />
-                      <Text className="ml-1 text-[10px] font-black text-amber-700 uppercase">Creator</Text>
+
+                      <Text className="ml-1.5 text-[9px] font-black uppercase tracking-wider text-amber-700">
+                        Creator
+                      </Text>
                     </View>
                   )}
                 </View>
 
-                {/* SIGNUP CODE BLOCK */}
+                {/* Signup code */}
                 {!isManaged && !isClaimed && item.signup_code && isAdmin && (
-                  <View className="mt-4 pt-4 border-t" style={{ borderTopColor: colors.border }}>
-                    <Text className="text-[9px] font-bold text-muted uppercase tracking-widest mb-1.5 ml-1">Share Code to Join</Text>
+                  <View
+                    style={{ borderTopColor: colors.border }}
+                    className="border-t px-4 pb-3.5 pt-3"
+                  >
+                    <Text className="mb-2 text-[9px] font-black uppercase tracking-[1.4px] text-muted">
+                      Share code to join
+                    </Text>
+
                     <Pressable
-                      onPress={(e) => {
-                        e.stopPropagation();
+                      onPress={(event) => {
+                        event.stopPropagation();
                         handleCopy(item.signup_code!, item.id);
                       }}
-                      style={{ backgroundColor: colors.background, borderWidth: 1.5, borderColor: colors.border }}
-                      className="flex-row items-center justify-between px-3.5 py-3 rounded-2xl"
+                      style={{
+                        backgroundColor: colors.background,
+                        borderColor: colors.border,
+                      }}
+                      className="flex-row items-center justify-between rounded-xl border px-3.5 py-3"
                     >
-                      <Text className="text-base font-black tracking-widest text-foreground">
+                      <Text className="text-base font-black tracking-[3px] text-foreground">
                         {item.signup_code}
                       </Text>
+
                       <View className="flex-row items-center">
-                        {copiedId === item.id ? (
-                          <Text className="text-xs text-primary font-black mr-2">Copied!</Text>
-                        ) : null}
-                        <Ionicons name="copy-outline" size={16} color={colors.primary} />
+                        {copiedId === item.id && (
+                          <Text
+                            style={{ color: colors.primary }}
+                            className="mr-2 text-[10px] font-black"
+                          >
+                            Copied
+                          </Text>
+                        )}
+
+                        <Ionicons
+                          name="copy-outline"
+                          size={16}
+                          color={colors.primary}
+                        />
                       </View>
                     </Pressable>
                   </View>
                 )}
 
-                {/* INTERACTIVE ACTIONS */}
-                {( (item.role === 'member' && isAdmin && isClaimed) || 
-                   (item.role === 'admin' && !item.is_founding_admin && isAdmin && isClaimed) || 
-                   (!isMe && isClaimed) ) && (
-                  <View className="flex-row items-center gap-2 flex-wrap mt-3 pt-3 border-t" style={{ borderTopColor: colors.border }}>
+                {/* Actions */}
+                {(
+                  (item.role === 'member' && isAdmin && isClaimed) ||
+                  (item.role === 'admin' &&
+                    !item.is_founding_admin &&
+                    isAdmin &&
+                    isClaimed) ||
+                  (!isMe && isClaimed)
+                ) && (
+                  <View
+                    style={{ borderTopColor: colors.border }}
+                    className="flex-row flex-wrap items-center gap-2 border-t px-4 pb-4 pt-3"
+                  >
                     {item.role === 'member' && isAdmin && isClaimed && (
                       <Pressable
-                        onPress={(e) => {
-                          e.stopPropagation();
+                        onPress={(event) => {
+                          event.stopPropagation();
                           confirmPromote(item);
                         }}
-                        style={{ borderColor: colors.primary, backgroundColor: `${colors.primary}08` }}
+                        style={{
+                          backgroundColor: `${colors.primary}08`,
+                          borderColor: `${colors.primary}35`,
+                        }}
                         className="flex-row items-center rounded-xl border px-3 py-2"
                       >
-                        <Ionicons name="shield-checkmark" size={13} color={colors.primary} />
-                        <Text className="ml-1.5 text-xs font-bold text-primary">Make Admin</Text>
+                        <Ionicons
+                          name="shield-checkmark-outline"
+                          size={13}
+                          color={colors.primary}
+                        />
+
+                        <Text
+                          style={{ color: colors.primary }}
+                          className="ml-1.5 text-xs font-bold"
+                        >
+                          Make Admin
+                        </Text>
                       </Pressable>
                     )}
 
-                    {item.role === 'admin' && !item.is_founding_admin && isAdmin && isClaimed && (
-                      <Pressable
-                        onPress={(e) => {
-                          e.stopPropagation();
-                          confirmDemote(item);
-                        }}
-                        style={{ borderColor: '#EF4444' }}
-                        className="flex-row items-center rounded-xl border px-3 py-2"
-                      >
-                        <Ionicons name="close" size={13} color="#EF4444" />
-                        <Text className="ml-1.5 text-xs font-bold text-red-500">Remove Admin</Text>
-                      </Pressable>
-                    )}
+                    {item.role === 'admin' &&
+                      !item.is_founding_admin &&
+                      isAdmin &&
+                      isClaimed && (
+                        <Pressable
+                          onPress={(event) => {
+                            event.stopPropagation();
+                            confirmDemote(item);
+                          }}
+                          style={{
+                            borderColor: '#EF444450',
+                            backgroundColor: '#EF444408',
+                          }}
+                          className="flex-row items-center rounded-xl border px-3 py-2"
+                        >
+                          <Ionicons
+                            name="close-circle-outline"
+                            size={13}
+                            color="#EF4444"
+                          />
+
+                          <Text className="ml-1.5 text-xs font-bold text-red-500">
+                            Remove Admin
+                          </Text>
+                        </Pressable>
+                      )}
 
                     {!isMe && isClaimed && (
                       <Pressable
-                        onPress={(e) => {
-                          e.stopPropagation();
+                        onPress={(event) => {
+                          event.stopPropagation();
                           router.push(`/dm?userId=${item.user_id}`);
                         }}
-                        style={{ borderColor: colors.border, backgroundColor: colors.background }}
-                        className="flex-row items-center rounded-xl border px-3.5 py-2 ml-auto"
+                        style={{
+                          backgroundColor: colors.background,
+                          borderColor: colors.border,
+                        }}
+                        className="ml-auto flex-row items-center rounded-xl border px-3 py-2"
                       >
-                        <Ionicons name="chatbubble-ellipses-outline" size={13} color={colors.foreground} />
-                        <Text className="text-xs font-bold text-foreground ml-1.5">Message</Text>
+                        <Ionicons
+                          name="chatbubble-ellipses-outline"
+                          size={13}
+                          color={colors.foreground}
+                        />
+
+                        <Text className="ml-1.5 text-xs font-bold text-foreground">
+                          Message
+                        </Text>
                       </Pressable>
                     )}
                   </View>
                 )}
               </Pressable>
-            );
-          }}
+            )}}
         />
       </View>
     </ScreenContainer>
+  );
+}
+
+function ProfileInsight({
+  icon,
+  label,
+  value,
+  colors,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  value: string;
+  colors: any;
+}) {
+  return (
+    <View
+      style={{
+        backgroundColor: colors.surface,
+        borderColor: `${colors.primary}20`,
+      }}
+      className="min-w-0 flex-1 rounded-xl border px-2.5 py-2"
+    >
+      <View className="flex-row items-center">
+        <Ionicons name={icon} size={13} color={colors.primary} />
+
+        <Text className="ml-1.5 text-[9px] font-black uppercase tracking-wider text-muted">
+          {label}
+        </Text>
+      </View>
+
+      <Text
+        numberOfLines={1}
+        className="mt-1 text-xs font-black text-foreground"
+      >
+        {value}
+      </Text>
+    </View>
   );
 }

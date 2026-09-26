@@ -1,10 +1,11 @@
 import { serve } from 'https://deno.land/std@0.190.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { pickFromPool } from '../_shared/game-utils.ts';
+import { rejectIfNotFamilyMember } from '../_shared/family-auth.ts';
+import { dailyLimitResponse } from '../_shared/daily-limit.ts';
 
 const DEEPSEEK_API_KEY = Deno.env.get('DEEPSEEK_API_KEY')!;
 const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
-
-const DAILY_SESSION_LIMIT = 5;
 
 interface GameQuestionRequest {
   family_id: string;
@@ -12,15 +13,6 @@ interface GameQuestionRequest {
   category?: string;
   difficulty?: 'easy' | 'medium' | 'hard';
   count?: number;
-}
-
-function shuffle<T>(arr: T[]): T[] {
-  const a = [...arr];
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a;
 }
 
 async function generateAndStoreQuestions(
@@ -64,6 +56,7 @@ Return ONLY valid JSON:
   const parsed = JSON.parse(content.replace(/```json|```/g, '').trim());
   if (!parsed.questions?.length) return [];
 
+  // family_id is left null on purpose: AI top-ups join the shared global bank.
   const rows = parsed.questions.map((q: any) => ({
     game_type: gameType, category: category ?? null, difficulty,
     question: q.question, options: q.options,
@@ -79,57 +72,31 @@ Return ONLY valid JSON:
 async function selectQuestions(
   familyId: string, gameType: string, category: string | undefined, difficulty: string, count: number
 ): Promise<string[]> {
-  // Track "seen" with a timestamp so we can protect the most recent games specifically,
-  // not just a binary seen/unseen forever-flag
-  const { data: seenRows } = await supabase
-    .from('family_question_seen')
-    .select('question_id, seen_at')
-    .eq('family_id', familyId)
-    .order('seen_at', { ascending: false });
-
-  const seenIds = new Set((seenRows ?? []).map((r: any) => r.question_id));
-
-  let query = supabase.from('game_question').select('id').eq('game_type', gameType).eq('difficulty', difficulty);
+  // GLOBAL bank only. Family-scoped rows (category 'family_specific', difficulty 'medium') live in
+  // the same table; without `family_id IS NULL` they were being mixed into every General Quiz game.
+  let query = supabase
+    .from('game_question')
+    .select('id')
+    .eq('game_type', gameType)
+    .eq('difficulty', difficulty)
+    .is('family_id', null);
   if (category) query = query.eq('category', category);
-  const { data: allMatching } = await query;
-  const allIds = (allMatching ?? []).map((q: any) => q.id);
+  const { data: bank } = await query;
+  const poolIds = (bank ?? []).map((q: any) => q.id as string);
 
-  const unseen = allIds.filter((id) => !seenIds.has(id));
-
-  let selected: string[] = [];
-
-  if (unseen.length >= count) {
-    selected = shuffle(unseen).slice(0, count) as any;
-  } else if (allIds.length >= count) {
-    // Not enough fully-unseen questions — reuse is unavoidable, but protect
-    // the MOST RECENTLY seen ones specifically, so back-to-back games don't repeat
-    const recentlySeenIds = new Set((seenRows ?? []).slice(0, count).map((r: any) => r.question_id));
-    const notRecentlySeen = allIds.filter((id) => !recentlySeenIds.has(id));
-
-    const pool = notRecentlySeen.length >= count ? notRecentlySeen : allIds;
-    selected = shuffle(pool).slice(0, count) as any;
-
-    // Only clear seen-history for what we're actually about to reuse,
-    // not the entire bank — keeps genuinely-unseen questions marked unseen
-    await supabase
-      .from('family_question_seen')
-      .delete()
-      .eq('family_id', familyId)
-      .in('question_id', selected);
-  } else {
-    selected = allIds;
-  }
+  // Least-recently-seen rotation; marks what it returns as seen.
+  let selected = await pickFromPool(supabase, familyId, poolIds, count);
 
   if (selected.length < count) {
     const aiIds = await generateAndStoreQuestions(gameType, category, difficulty, count - selected.length);
+    if (aiIds.length > 0) {
+      // The family is about to play these too, so mark them seen like the rest.
+      await supabase.from('family_question_seen').upsert(
+        aiIds.map((id) => ({ family_id: familyId, question_id: id, seen_at: new Date().toISOString() })),
+        { onConflict: 'family_id,question_id' }
+      );
+    }
     selected = [...selected, ...aiIds];
-  }
-
-  if (selected.length > 0) {
-    await supabase.from('family_question_seen').upsert(
-      selected.map((id) => ({ family_id: familyId, question_id: id, seen_at: new Date().toISOString() })),
-      { onConflict: 'family_id,question_id' }
-    );
   }
 
   return selected;
@@ -143,18 +110,11 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: 'Missing required fields' }), { status: 400 });
     }
 
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
-    const { count: sessionsToday } = await supabase
-      .from('game_session')
-      .select('id', { count: 'exact', head: true })
-      .eq('family_id', family_id)
-      .neq('status', 'cancelled')
-      .gte('created_at', todayStart.toISOString());
+    const denied = await rejectIfNotFamilyMember(req, family_id);
+    if (denied) return denied;
 
-    if ((sessionsToday ?? 0) >= DAILY_SESSION_LIMIT) {
-      return new Response(JSON.stringify({ error: 'daily_limit_reached', limit: DAILY_SESSION_LIMIT }), { status: 429 });
-    }
+    const limited = await dailyLimitResponse(supabase, family_id);
+    if (limited) return limited;
 
     const questionIds = await selectQuestions(family_id, game_type, category, difficulty, count);
 

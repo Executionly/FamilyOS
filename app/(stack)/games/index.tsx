@@ -23,7 +23,7 @@ export default function GamesHubScreen() {
   const segment = useSegments()
   const { family, currentMember } = useFamilyStore();
   const { user } = useAuthStore();
-  const { startSession, loading, dailyLimitReached } = useGameStore();
+  const { startSession, loading, dailyLimitReached, charterRequired } = useGameStore();
 
   const [selectedGame, setSelectedGame] = useState<'bible_trivia' | 'quiz' | null>(null);
   const [mode, setMode] = useState<'solo' | 'multiplayer'>('solo');
@@ -32,7 +32,9 @@ export default function GamesHubScreen() {
   const [activeSession, setActiveSession] = useState<GameSession | null>(null);
   const { members } = useFamilyStore();
   const { findActiveSession, inviteAndStart } = useGameStore();
+  const [useFamilyData, setUseFamilyData] = useState(false)
   const isPremium = family?.subscription_tier === 'premium';
+  const familyMode = selectedGame === 'quiz' && useFamilyData;
 
   useEffect(() => {
     if (family?.id && currentMember?.id) {
@@ -45,12 +47,16 @@ export default function GamesHubScreen() {
 
   const handleStart = async () => {
     if (!selectedGame || !family?.id || !user?.id || !currentMember?.id) return;
-
+  
+    // familySpecific is computed from selectedGame, so toggling "Know Our Family" on and then
+    // switching to Bible Trivia can't leak the flag into the wrong game.
+    const options = { difficulty, count: 10, familySpecific: familyMode };
+  
     if (mode === 'multiplayer') {
-      const session = await inviteAndStart(family.id, user.id, currentMember.id, selectedGame, invitedIds, { difficulty, count: 10 });
+      const session = await inviteAndStart(family.id, user.id, currentMember.id, selectedGame, invitedIds, options);
       if (session) router.push(`/(stack)/games/lobby?sessionId=${session.id}`);
     } else {
-      const session = await startSession(family.id, user.id, currentMember.id, selectedGame, mode, { difficulty, count: 10 });
+      const session = await startSession(family.id, user.id, currentMember.id, selectedGame, mode, options);
       if (session) router.push(`/(stack)/games/play?sessionId=${session.id}`);
     }
   };
@@ -147,6 +153,18 @@ export default function GamesHubScreen() {
           </View>
         )}
 
+        {charterRequired && (
+          <Pressable
+            onPress={() => router.push('/foundation')}
+            className="mb-4 rounded-2xl border border-border bg-surface p-4"
+          >
+            <Text className="text-sm font-bold text-foreground">Set up your Family Charter first</Text>
+            <Text className="mt-1 text-xs text-muted">
+              Know Our Family builds its questions from your mission, vision and values. Tap to set it up.
+            </Text>
+          </Pressable>
+        )}
+
         {/* RESUME ACTIVE SESSION */}
         {activeSession && (
           <Pressable
@@ -232,7 +250,7 @@ export default function GamesHubScreen() {
         </View>
 
         {selectedGame && (
-          <>
+          <View>
             {/* STEP 2: MODE */}
             <View className="mb-6">
               <View className="flex-row items-center mb-3 ml-1">
@@ -369,8 +387,30 @@ export default function GamesHubScreen() {
               </View>
             )}
 
-            {/* STEP 3: DIFFICULTY */}
-            <View className="mb-8">
+            {/* STEP 3: KNOW YOUR FAMILY */}
+            {selectedGame === 'quiz' && isPremium && <View className='mb-5'>
+              <View className="flex-row items-center mb-3 ml-1">
+                <View style={{ backgroundColor: colors.primary }} className="w-5 h-5 rounded-full items-center justify-center mr-2">
+                  <Text className="text-[10px] font-black text-white">{mode === 'multiplayer' ? '4' : '3'}</Text>
+                </View>
+                <Text className="text-[10px] font-black text-muted uppercase tracking-widest">Difficulty level</Text>
+              </View>
+
+              <Pressable
+                onPress={() => setUseFamilyData((v) => !v)}
+                className={`mb-6 flex-row items-center rounded-2xl border-2 p-4 ${useFamilyData ? 'border-primary bg-primary/5' : 'border-border bg-surface'}`}
+              >
+                <Ionicons name="people-circle-outline" size={22} color={useFamilyData ? colors.primary : colors.foreground} />
+                <View className="ml-3 flex-1">
+                  <Text className="text-sm font-bold text-foreground">Know Our Family</Text>
+                  <Text className="text-xs text-muted">Questions based on your family's mission, values & members</Text>
+                </View>
+                {useFamilyData && <Ionicons name="checkmark-circle" size={20} color={colors.primary} />}
+              </Pressable>
+            </View>}
+
+            {/* STEP 4: DIFFICULTY */}
+            {!familyMode && <View className="mb-8">
               <View className="flex-row items-center mb-3 ml-1">
                 <View style={{ backgroundColor: colors.primary }} className="w-5 h-5 rounded-full items-center justify-center mr-2">
                   <Text className="text-[10px] font-black text-white">{mode === 'multiplayer' ? '4' : '3'}</Text>
@@ -411,7 +451,7 @@ export default function GamesHubScreen() {
                   );
                 })}
               </View>
-            </View>
+            </View>}
 
             {/* DAILY LIMIT WARNING */}
             {dailyLimitReached && (
@@ -427,6 +467,18 @@ export default function GamesHubScreen() {
                   <Text className="text-[11px] text-muted font-medium">Come back tomorrow for more fun!</Text>
                 </View>
               </View>
+            )}
+
+            {charterRequired && (
+              <Pressable
+                onPress={() => router.push('/foundation')}
+                className="mb-4 rounded-2xl border border-border bg-surface p-4"
+              >
+                <Text className="text-sm font-bold text-foreground">Set up your Family Charter first</Text>
+                <Text className="mt-1 text-xs text-muted">
+                  Know Our Family builds its questions from your mission, vision and values. Tap to set it up.
+                </Text>
+              </Pressable>
             )}
 
             {/* START BUTTON */}
@@ -462,7 +514,7 @@ export default function GamesHubScreen() {
                 </Text>
               </View>
             )}
-          </>
+          </View>
         )}
       </ScrollView>
     </ScreenContainer>

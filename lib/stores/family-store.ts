@@ -3,6 +3,7 @@ import { supabase } from '@/lib/_core/supabase';
 import { embedContent } from '../services/embed-content';
 import { notifyMember } from '../services/notify';
 import { checkStorageBeforeUpload, getFileSizeBytes, recordUpload, StorageLimitError } from '@/utils/storage-gate';
+import { ProductivityEnergy, TemperamentType } from '@/types';
 
 export class MemberLimitError extends Error {
   constructor() {
@@ -13,6 +14,8 @@ export class MemberLimitError extends Error {
 export type MemberRole = 'admin' | 'coparent' | 'member' | 'child' | string;
 export type AgeBand = 'toddler' | 'child' | 'preteen' | 'teen' | 'adult' | string;
 
+export type SharingPreference = 'private' | 'family';
+ 
 export interface Member {
   id: string;
   family_id: string;
@@ -26,9 +29,17 @@ export interface Member {
   is_founding_admin?: boolean;
   dashboard_guide_seen_at?: string;
   ai_intro_seen_at?: string;
-  date_of_birth?: string | null; 
-  bio?: string; 
-  phone_number?: string
+  date_of_birth?: string | null;
+  bio?: string;
+  phone_number?: string;
+  dietary_notes?: string;
+  // Know Your Family fields
+  temperament_type?: TemperamentType | null;
+  productivity_energy?: ProductivityEnergy | null;
+  assessment_completed: boolean;
+  assessment_version?: number | null;
+  assessment_date?: string | null;
+  sharing_preference: SharingPreference;
   created_at: string;
   updated_at: string;
 }

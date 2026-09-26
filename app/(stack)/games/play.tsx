@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { View, Text, Pressable, ActivityIndicator, ScrollView } from 'react-native';
+import { View, Text, Pressable, ActivityIndicator, ScrollView, TouchableOpacity } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { ScreenContainer } from '@/components/screen-container';
@@ -7,7 +7,7 @@ import { useColors } from '@/hooks/use-colors';
 import { useFamilyStore } from '@/lib/stores/family-store';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { useGameStore } from '@/lib/stores/game-store';
-import { QUESTION_TIME_LIMIT_MS, GAME_META } from '@/constants/games';
+import { QUESTION_TIME_LIMIT_MS, GAME_META, SOLO_QUESTION_TIME_LIMIT_MS } from '@/constants/games';
 import { supabase } from '@/lib/_core/supabase';
 import { PointsInfoButton } from '@/components/modals/PointInfoCard';
 
@@ -26,16 +26,16 @@ export default function GamePlayScreen() {
 
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
   const [answerResult, setAnswerResult] = useState<{ correct: boolean; explanation?: string } | null>(null);
-  const [timeLeft, setTimeLeft] = useState(QUESTION_TIME_LIMIT_MS);
   const [myParticipantId, setMyParticipantId] = useState<string | null>(null);
   const questionStartRef = useRef(Date.now());
   const { pauseSession, resumeSession } = useGameStore();
   const isPaused = currentSession?.status === 'paused';
-
+  
   const isHost = currentSession?.created_by === user?.id;
   const currentQuestion = questions[currentSession?.current_question_index ?? 0];
   const isMultiplayer = currentSession?.mode === 'multiplayer';
   const isComplete = currentSession?.status === 'completed';
+  const [timeLeft, setTimeLeft] = useState(isMultiplayer ? QUESTION_TIME_LIMIT_MS : SOLO_QUESTION_TIME_LIMIT_MS);
 
   useEffect(() => {
     if (!sessionId) return;
@@ -193,7 +193,7 @@ export default function GamePlayScreen() {
             className="mt-8 flex-row items-center justify-center rounded-2xl py-4 bg-primary-dark"
           >
             <Ionicons name="game-controller" size={18} color="#fff" />
-            <Text className="ml-2 text-sm font-bold text-white">Play Again</Text>
+            <Text className="ml-2 text-sm font-bold text-white">Go to games</Text>
           </Pressable>
         </ScrollView>
       </ScreenContainer>
@@ -218,35 +218,6 @@ export default function GamePlayScreen() {
 
   return (
     <ScreenContainer containerClassName="bg-background" safeAreaClassName="bg-background">
-      {isPaused ? (
-        <View className="items-center justify-center flex-1 px-8">
-          <View
-            style={{ backgroundColor: colors.surface, borderColor: colors.border }}
-            className="w-full rounded-3xl border p-8 items-center"
-          >
-            <View
-              style={{ backgroundColor: `${colors.primary}15` }}
-              className="w-20 h-20 rounded-full items-center justify-center mb-4"
-            >
-              <Ionicons name="pause" size={40} color={colors.primary} />
-            </View>
-            <Text className="text-xl font-black text-foreground">Game Paused</Text>
-            <Text className="mt-2 text-xs text-muted font-medium text-center">
-              Take a breather. Resume whenever you're ready.
-            </Text>
-            {(!isMultiplayer || isHost) && (
-              <Pressable
-                onPress={() => sessionId && resumeSession(sessionId)}
-                style={({ pressed }) => [{ backgroundColor: colors.primary, opacity: pressed ? 0.85 : 1 }]}
-                className="mt-6 flex-row items-center rounded-2xl px-6 py-3 bg-primary-light"
-              >
-                <Ionicons name="play" size={16} color="#fff" />
-                <Text className="ml-2 text-sm font-bold text-white">Resume Game</Text>
-              </Pressable>
-            )}
-          </View>
-        </View>
-      ) : (
         <ScrollView
           contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: 40 }}
           showsVerticalScrollIndicator={false}
@@ -283,241 +254,321 @@ export default function GamePlayScreen() {
             </View>
           </View>
 
-          {/* TIMER RING + PROGRESS */}
-          <View
-            style={{ backgroundColor: colors.surface, borderColor: colors.border }}
-            className="rounded-3xl border p-5 mb-5"
-          >
-            <View className="flex-row items-center justify-between mb-4">
-              <View>
-                <Text className="text-[10px] font-bold text-muted uppercase tracking-widest">Question</Text>
-                <Text className="text-lg font-black text-foreground mt-0.5">
-                  {currentSession.current_question_index + 1}
-                  <Text className="text-sm font-bold text-muted"> / {currentSession.question_ids.length}</Text>
-                </Text>
-              </View>
-
-              <View
-                style={{
-                  backgroundColor: `${timerColor}15`,
-                  borderColor: `${timerColor}40`,
-                }}
-                className="flex-row items-center rounded-2xl border px-4 py-2"
-              >
-                <Ionicons name="time" size={14} color={timerColor} />
-                <Text style={{ color: timerColor }} className="ml-1.5 text-base font-black">
-                  {Math.ceil(timeLeft / 1000)}s
-                </Text>
-              </View>
-            </View>
-
-            {/* Timer bar */}
-            <View
-              style={{ backgroundColor: colors.background }}
-              className="h-2 overflow-hidden rounded-full mb-2"
-            >
-              <View
-                className="h-full rounded-full"
-                style={{ width: `${timePercent * 100}%`, backgroundColor: timerColor }}
-              />
-            </View>
-
-            {/* Progress bar */}
-            <View
-              style={{ backgroundColor: colors.background }}
-              className="h-1 overflow-hidden rounded-full"
-            >
-              <View
-                className="h-full rounded-full"
-                style={{ width: `${progress * 100}%`, backgroundColor: colors.primary }}
-              />
-            </View>
-          </View>
-
-          {timeLeft === 0 && !answerResult && isMultiplayer && !isHost && (
-            <View className="mt-4 items-center">
-              <ActivityIndicator size="small" color={colors.muted} />
-              <Text className="mt-2 text-xs text-muted">Waiting for the next question...</Text>
-            </View>
-          )}
-
-          {/* LIVE LEADERBOARD */}
-          {isMultiplayer && (
-            <View className="mb-5">
-              <Text className="text-[10px] font-bold text-muted uppercase tracking-widest mb-2 ml-1">
-                Live Standings
-              </Text>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={{ gap: 8 }}
-              >
-                {[...participants]
-                  .sort((a, b) => b.score - a.score)
-                  .map((p, i) => {
-                    const isMe = p.id === myParticipantId;
-                    return (
-                      <View
-                        key={p.id}
-                        style={{
-                          backgroundColor: isMe ? colors.primary : colors.surface,
-                          borderColor: isMe ? colors.primary : colors.border,
-                        }}
-                        className="flex-row items-center rounded-2xl border px-3 py-2"
-                      >
-                        <View
-                          style={{
-                            backgroundColor: isMe
-                              ? 'rgba(255,255,255,0.2)'
-                              : i === 0
-                              ? '#F59E0B20'
-                              : colors.background,
-                          }}
-                          className="w-5 h-5 rounded-full items-center justify-center mr-2"
-                        >
-                          <Text
-                            style={{ color: isMe ? '#fff' : i === 0 ? '#F59E0B' : colors.muted }}
-                            className="text-[9px] font-black"
-                          >
-                            {i + 1}
-                          </Text>
-                        </View>
-                        <Text
-                          style={{ color: isMe ? '#fff' : colors.foreground }}
-                          className="text-xs font-bold mr-2"
-                        >
-                          {p.member?.name ?? 'Player'}
-                        </Text>
-                        <Text
-                          style={{ color: isMe ? '#fff' : colors.primary }}
-                          className="text-xs font-black"
-                        >
-                          {p.score}
-                        </Text>
-                      </View>
-                    );
-                  })}
-              </ScrollView>
-            </View>
-          )}
-
-          {/* QUESTION CARD */}
-          <View
-            style={{
-              backgroundColor: colors.surface,
-              borderColor: colors.border,
-              borderLeftColor: meta.color,
-              borderLeftWidth: 4,
-            }}
-            className="rounded-3xl border p-6 mb-5"
-          >
-            <Text className="text-[10px] font-bold text-muted uppercase tracking-widest mb-2">
-              The Question
-            </Text>
-            <Text className="text-lg font-bold leading-7 text-foreground">
-              {currentQuestion.question}
-            </Text>
-          </View>
-
-          {/* OPTIONS */}
-          <View className="gap-2.5">
-            {currentQuestion.options.map((opt, i) => {
-              const isSelected = selectedOption === i;
-              const showCorrectness = answerResult !== null;
-              const isCorrectAnswer = showCorrectness && currentQuestion.correct_option_index === i;
-
-              let borderColor = colors.border;
-              let bgColor = colors.surface;
-              let iconName: any = null;
-              let iconColor = colors.muted;
-              let labelBg = colors.background;
-              let labelColor = colors.foreground;
-
-              if (showCorrectness && isCorrectAnswer) {
-                borderColor = '#10B981';
-                bgColor = '#10B98110';
-                iconName = 'checkmark-circle';
-                iconColor = '#10B981';
-                labelBg = '#10B981';
-                labelColor = '#fff';
-              } else if (showCorrectness && isSelected && !answerResult.correct) {
-                borderColor = '#EF4444';
-                bgColor = '#EF444410';
-                iconName = 'close-circle';
-                iconColor = '#EF4444';
-                labelBg = '#EF4444';
-                labelColor = '#fff';
-              } else if (isSelected) {
-                borderColor = colors.primary;
-                bgColor = `${colors.primary}08`;
-                labelBg = colors.primary;
-                labelColor = '#fff';
-              }
-
-              return (
-                <Pressable
-                  key={i}
-                  onPress={() => handleSelectOption(i)}
-                  disabled={selectedOption !== null}
-                  style={({ pressed }) => [
-                    {
-                      backgroundColor: bgColor,
-                      borderColor,
-                      opacity: pressed && selectedOption === null ? 0.85 : 1,
-                    },
-                  ]}
-                  className="flex-row items-center rounded-2xl border-2 p-4"
-                >
+          {
+            isPaused ? (
+              <View className="flex-1 items-center justify-center px-5 mt-8">
                   <View
-                    style={{ backgroundColor: labelBg }}
-                    className="w-9 h-9 rounded-xl items-center justify-center mr-3"
+                  style={{
+                    backgroundColor: colors.surface,
+                    borderColor: colors.border,
+                    shadowColor: colors.primary,
+                    shadowOpacity: 0.08,
+                    shadowRadius: 24,
+                    shadowOffset: { width: 0, height: 12 },
+                    elevation: 4,
+                  }}
+                  className="w-full overflow-hidden rounded-[28px] border">
+                  <View
+                    style={{ backgroundColor: `${colors.primary}0A` }}
+                    className="items-center px-7 pb-7 pt-8"
                   >
-                    <Text style={{ color: labelColor }} className="text-sm font-black">
-                      {OPTION_LABELS[i]}
+                    <View
+                      style={{
+                        backgroundColor: `${colors.primary}18`,
+                        borderColor: `${colors.primary}35`,
+                      }}
+                      className="mb-5 h-20 w-20 items-center justify-center rounded-full border"
+                    >
+                      <Ionicons name="pause" size={36} color={colors.primary} />
+                    </View>
+
+                    <Text className="text-center text-2xl font-black text-foreground">
+                      Game paused
+                    </Text>
+
+                    <Text className="mt-2 max-w-[250px] text-center text-sm font-medium leading-5 text-muted">
+                      Take a breather. Resume whenever you’re ready.
                     </Text>
                   </View>
-                  <Text className="flex-1 text-sm font-semibold text-foreground leading-5">
-                    {opt}
-                  </Text>
-                  {iconName && (
-                    <Ionicons name={iconName} size={22} color={iconColor} style={{ marginLeft: 8 }} />
-                  )}
-                </Pressable>
-              );
-            })}
-          </View>
 
-          {/* RESULT / EXPLANATION */}
-          {answerResult && (
-            <View
-              style={{
-                backgroundColor: answerResult.correct ? '#10B98110' : '#EF444410',
-                borderColor: answerResult.correct ? '#10B98140' : '#EF444440',
-              }}
-              className="mt-5 rounded-2xl border p-4"
-            >
-              <View className="flex-row items-center mb-2">
-                <Ionicons
-                  name={answerResult.correct ? 'checkmark-circle' : 'close-circle'}
-                  size={20}
-                  color={answerResult.correct ? '#10B981' : '#EF4444'}
-                />
-                <Text
-                  style={{ color: answerResult.correct ? '#10B981' : '#EF4444' }}
-                  className="ml-2 text-sm font-black"
+                  {(!isMultiplayer || isHost) && (
+                    <View className="px-6 pb-6 pt-5">
+                      <TouchableOpacity
+                        onPress={() => sessionId && resumeSession(sessionId)}
+                        style={({
+                          backgroundColor: colors.primary,
+                          shadowColor: colors.primary,
+                          shadowOpacity: 0.22,
+                          shadowRadius: 10,
+                          shadowOffset: { width: 0, height: 5 },
+                          elevation: 4,
+                        })}
+                        className="flex-row items-center justify-center rounded-2xl py-4"
+                      >
+                        <Ionicons name="play" size={18} color="#fff" />
+                        <Text className="ml-2 text-sm font-black text-white">
+                          Resume game
+                        </Text>
+                        <Ionicons
+                          name="arrow-forward"
+                          size={17}
+                          color="#fff"
+                          style={{ marginLeft: 8 }}
+                        />
+                      </TouchableOpacity>
+                    </View>
+                  )}
+
+                  {isMultiplayer && !isHost && (
+                    <View className="flex-row items-center justify-center px-6 pb-6 pt-1">
+                      <Ionicons name="time-outline" size={15} color={colors.muted} />
+                      <Text className="ml-2 text-xs font-semibold text-muted">
+                        Waiting for the host to resume
+                      </Text>
+                    </View>
+                  )}
+                  </View> 
+                </View> 
+            ) : (
+              <>
+                {/* TIMER RING + PROGRESS */}
+                <View
+                  style={{ backgroundColor: colors.surface, borderColor: colors.border }}
+                  className="rounded-3xl border p-5 mb-5"
                 >
-                  {answerResult.correct ? 'Correct!' : 'Not quite'}
-                </Text>
-              </View>
-              {answerResult.explanation && (
-                <Text className="text-xs text-foreground leading-5 font-medium">
-                  {answerResult.explanation}
-                </Text>
-              )}
-            </View>
-          )}
+                  <View className="flex-row items-center justify-between mb-4">
+                    <View>
+                      <Text className="text-[10px] font-bold text-muted uppercase tracking-widest">Question</Text>
+                      <Text className="text-lg font-black text-foreground mt-0.5">
+                        {currentSession.current_question_index + 1}
+                        <Text className="text-sm font-bold text-muted"> / {currentSession.question_ids.length}</Text>
+                      </Text>
+                    </View>
+      
+                    <View
+                      style={{
+                        backgroundColor: `${timerColor}15`,
+                        borderColor: `${timerColor}40`,
+                      }}
+                      className="flex-row items-center rounded-2xl border px-4 py-2"
+                    >
+                      <Ionicons name="time" size={14} color={timerColor} />
+                      <Text style={{ color: timerColor }} className="ml-1.5 text-base font-black">
+                        {Math.ceil(timeLeft / 1000)}s
+                      </Text>
+                    </View>
+                  </View>
+      
+                  {/* Timer bar */}
+                  <View
+                    style={{ backgroundColor: colors.background }}
+                    className="h-2 overflow-hidden rounded-full mb-2"
+                  >
+                    <View
+                      className="h-full rounded-full"
+                      style={{ width: `${timePercent * 100}%`, backgroundColor: timerColor }}
+                    />
+                  </View>
+      
+                  {/* Progress bar */}
+                  <View
+                    style={{ backgroundColor: colors.background }}
+                    className="h-1 overflow-hidden rounded-full"
+                  >
+                    <View
+                      className="h-full rounded-full"
+                      style={{ width: `${progress * 100}%`, backgroundColor: colors.primary }}
+                    />
+                  </View>
+                </View>
+      
+                {timeLeft === 0 && !answerResult && isMultiplayer && !isHost && (
+                  <View className="mt-4 items-center">
+                    <ActivityIndicator size="small" color={colors.muted} />
+                    <Text className="mt-2 text-xs text-muted">Waiting for the next question...</Text>
+                  </View>
+                )}
+      
+                {/* LIVE LEADERBOARD */}
+                {isMultiplayer && (
+                  <View className="mb-5">
+                    <Text className="text-[10px] font-bold text-muted uppercase tracking-widest mb-2 ml-1">
+                      Live Standings
+                    </Text>
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={{ gap: 8 }}
+                    >
+                      {[...participants]
+                        .sort((a, b) => b.score - a.score)
+                        .map((p, i) => {
+                          const isMe = p.id === myParticipantId;
+                          return (
+                            <View
+                              key={p.id}
+                              style={{
+                                backgroundColor: isMe ? colors.primary : colors.surface,
+                                borderColor: isMe ? colors.primary : colors.border,
+                              }}
+                              className="flex-row items-center rounded-2xl border px-3 py-2"
+                            >
+                              <View
+                                style={{
+                                  backgroundColor: isMe
+                                    ? 'rgba(255,255,255,0.2)'
+                                    : i === 0
+                                    ? '#F59E0B20'
+                                    : colors.background,
+                                }}
+                                className="w-5 h-5 rounded-full items-center justify-center mr-2"
+                              >
+                                <Text
+                                  style={{ color: isMe ? '#fff' : i === 0 ? '#F59E0B' : colors.muted }}
+                                  className="text-[9px] font-black"
+                                >
+                                  {i + 1}
+                                </Text>
+                              </View>
+                              <Text
+                                style={{ color: isMe ? '#fff' : colors.foreground }}
+                                className="text-xs font-bold mr-2"
+                              >
+                                {p.member?.name ?? 'Player'}
+                              </Text>
+                              <Text
+                                style={{ color: isMe ? '#fff' : colors.primary }}
+                                className="text-xs font-black"
+                              >
+                                {p.score}
+                              </Text>
+                            </View>
+                          );
+                        })}
+                    </ScrollView>
+                  </View>
+                )}
+      
+                {/* QUESTION CARD */}
+                <View
+                  style={{
+                    backgroundColor: colors.surface,
+                    borderColor: colors.border,
+                    borderLeftColor: meta.color,
+                    borderLeftWidth: 4,
+                  }}
+                  className="rounded-3xl border p-6 mb-5"
+                >
+                  <Text className="text-[10px] font-bold text-muted uppercase tracking-widest mb-2">
+                    The Question
+                  </Text>
+                  <Text className="text-lg font-bold leading-7 text-foreground">
+                    {currentQuestion.question}
+                  </Text>
+                </View>
+      
+                {/* OPTIONS */}
+                <View className="gap-2.5">
+                  {currentQuestion.options.map((opt, i) => {
+                    const isSelected = selectedOption === i;
+                    const showCorrectness = answerResult !== null;
+                    const isCorrectAnswer = showCorrectness && currentQuestion.correct_option_index === i;
+      
+                    let borderColor = colors.border;
+                    let bgColor = colors.surface;
+                    let iconName: any = null;
+                    let iconColor = colors.muted;
+                    let labelBg = colors.background;
+                    let labelColor = colors.foreground;
+      
+                    if (showCorrectness && isCorrectAnswer) {
+                      borderColor = '#10B981';
+                      bgColor = '#10B98110';
+                      iconName = 'checkmark-circle';
+                      iconColor = '#10B981';
+                      labelBg = '#10B981';
+                      labelColor = '#fff';
+                    } else if (showCorrectness && isSelected && !answerResult.correct) {
+                      borderColor = '#EF4444';
+                      bgColor = '#EF444410';
+                      iconName = 'close-circle';
+                      iconColor = '#EF4444';
+                      labelBg = '#EF4444';
+                      labelColor = '#fff';
+                    } else if (isSelected) {
+                      borderColor = colors.primary;
+                      bgColor = `${colors.primary}08`;
+                      labelBg = colors.primary;
+                      labelColor = '#fff';
+                    }
+      
+                    return (
+                      <Pressable
+                        key={i}
+                        onPress={() => handleSelectOption(i)}
+                        disabled={selectedOption !== null}
+                        style={({ pressed }) => [
+                          {
+                            backgroundColor: bgColor,
+                            borderColor,
+                            opacity: pressed && selectedOption === null ? 0.85 : 1,
+                          },
+                        ]}
+                        className="flex-row items-center rounded-2xl border-2 p-4"
+                      >
+                        <View
+                          style={{ backgroundColor: labelBg }}
+                          className="w-9 h-9 rounded-xl items-center justify-center mr-3"
+                        >
+                          <Text style={{ color: labelColor }} className="text-sm font-black">
+                            {OPTION_LABELS[i]}
+                          </Text>
+                        </View>
+                        <Text className="flex-1 text-sm font-semibold text-foreground leading-5">
+                          {opt}
+                        </Text>
+                        {iconName && (
+                          <Ionicons name={iconName} size={22} color={iconColor} style={{ marginLeft: 8 }} />
+                        )}
+                      </Pressable>
+                    );
+                  })}
+                </View>
+      
+                {/* RESULT / EXPLANATION */}
+                {answerResult && (
+                  <View
+                    style={{
+                      backgroundColor: answerResult.correct ? '#10B98110' : '#EF444410',
+                      borderColor: answerResult.correct ? '#10B98140' : '#EF444440',
+                    }}
+                    className="mt-5 rounded-2xl border p-4"
+                  >
+                    <View className="flex-row items-center mb-2">
+                      <Ionicons
+                        name={answerResult.correct ? 'checkmark-circle' : 'close-circle'}
+                        size={20}
+                        color={answerResult.correct ? '#10B981' : '#EF4444'}
+                      />
+                      <Text
+                        style={{ color: answerResult.correct ? '#10B981' : '#EF4444' }}
+                        className="ml-2 text-sm font-black"
+                      >
+                        {answerResult.correct ? 'Correct!' : 'Not quite'}
+                      </Text>
+                    </View>
+                    {answerResult.explanation && (
+                      <Text className="text-xs text-foreground leading-5 font-medium">
+                        {answerResult.explanation}
+                      </Text>
+                    )}
+                  </View>
+                )}
+              </>
+            )
+          }
+
         </ScrollView>
-      )}
     </ScreenContainer>
   );
 }

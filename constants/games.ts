@@ -14,3 +14,4 @@ export const GAME_META = {
 };
 
 export const QUESTION_TIME_LIMIT_MS = 15000; // 15 seconds per question
+export const SOLO_QUESTION_TIME_LIMIT_MS = 20000; // 15 seconds per question

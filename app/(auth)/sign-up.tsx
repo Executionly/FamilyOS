@@ -1,18 +1,138 @@
 import { useState } from 'react';
-import { ScrollView, Text, View, TextInput, Pressable, ActivityIndicator, TouchableOpacity, Platform,KeyboardAvoidingView } from 'react-native';
+import {
+  ScrollView,
+  Text,
+  View,
+  TextInput,
+  Pressable,
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+} from 'react-native';
 import { Link, useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { ScreenContainer } from '@/components/screen-container';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { useColors } from '@/hooks/use-colors';
 import { CountryPickerModal } from '@/components/modals/country-picker';
-import { Ionicons } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+function PasswordField({
+  label,
+  value,
+  placeholder,
+  visible,
+  onChangeText,
+  onToggleVisibility,
+  disabled,
+  colors,
+  hint,
+}: {
+  label: string;
+  value: string;
+  placeholder: string;
+  visible: boolean;
+  onChangeText: (value: string) => void;
+  onToggleVisibility: () => void;
+  disabled: boolean;
+  colors: any;
+  hint?: string;
+}) {
+  return (
+    <View className="mb-4">
+      <Text className="mb-2 text-[10px] font-black uppercase tracking-[1.3px] text-muted">
+        {label}
+      </Text>
+
+      <View
+        style={{
+          backgroundColor: colors.background,
+          borderColor: colors.border,
+        }}
+        className="flex-row items-center rounded-2xl border px-4"
+      >
+        <Ionicons
+          name="lock-closed-outline"
+          size={17}
+          color={colors.muted}
+        />
+
+        <TextInput
+          value={value}
+          onChangeText={onChangeText}
+          placeholder={placeholder}
+          placeholderTextColor={colors.muted}
+          editable={!disabled}
+          secureTextEntry={!visible}
+          autoCapitalize="none"
+          autoCorrect={false}
+          style={{
+            flex: 1,
+            color: colors.foreground,
+            fontSize: 14,
+            paddingVertical: 15,
+            paddingHorizontal: 12,
+          }}
+        />
+
+        <Pressable
+          onPress={onToggleVisibility}
+          disabled={disabled}
+          hitSlop={10}
+          style={({ pressed }) => ({
+            opacity: disabled ? 0.4 : pressed ? 0.55 : 1,
+          })}
+          className="h-9 w-9 items-center justify-center rounded-xl"
+        >
+          <Ionicons
+            name={visible ? 'eye-off-outline' : 'eye-outline'}
+            size={20}
+            color={colors.muted}
+          />
+        </Pressable>
+      </View>
+
+      {hint && (
+        <Text className="mt-1.5 text-[11px] font-medium text-muted">
+          {hint}
+        </Text>
+      )}
+    </View>
+  );
+}
+
+function ErrorNotice({
+  message,
+}: {
+  message: string;
+}) {
+  return (
+    <View
+      style={{
+        backgroundColor: '#EF44440D',
+        borderColor: '#EF444440',
+      }}
+      className="mb-5 flex-row items-start rounded-2xl border px-4 py-3.5"
+    >
+      <Ionicons
+        name="alert-circle-outline"
+        size={18}
+        color="#EF4444"
+      />
+
+      <Text className="ml-3 flex-1 text-sm leading-5 text-red-500">
+        {message}
+      </Text>
+    </View>
+  );
+}
 
 export default function SignUpScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const colors = useColors();
+
   const { signUp, loading, error, setError } = useAuthStore();
 
   const [fullName, setFullName] = useState('');
@@ -21,331 +141,502 @@ export default function SignUpScreen() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [country, setCountry] = useState<string | null>(null);
   const [ethnicity, setEthnicity] = useState('');
-  const [userRole, setUserRole] = useState<'father' | 'mother' | string>('father');
-  const [countryModalVisible, setCountryModalVisible] = useState(false);
-  const [validationError, setValidationError] = useState<string | null>(null);
+  const [userRole, setUserRole] = useState<'father' | 'mother' | string>(
+    'father',
+  );
+  const [countryModalVisible, setCountryModalVisible] =
+    useState(false);
+  const [validationError, setValidationError] = useState<string | null>(
+    null,
+  );
   const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] =
+    useState(false);
 
   const handleSignUp = async () => {
     setValidationError(null);
     setError(null);
 
-    // Validation
     if (!fullName.trim()) {
-      setValidationError('Full name is required');
+      setValidationError('Full name is required.');
       return;
     }
+
     if (!email.trim()) {
-      setValidationError('Email is required');
+      setValidationError('Email is required.');
       return;
     }
+
     if (!password.trim()) {
-      setValidationError('Password is required');
+      setValidationError('Password is required.');
       return;
     }
+
     if (password.length < 8) {
-      setValidationError('Password must be at least 8 characters');
+      setValidationError(
+        'Password must be at least 8 characters.',
+      );
       return;
     }
+
     if (password !== confirmPassword) {
-      setValidationError('Passwords do not match');
+      setValidationError('Passwords do not match.');
       return;
     }
 
     if (!country) {
-      setValidationError('Please select your country');
+      setValidationError('Please select your country.');
       return;
     }
 
     try {
-      await signUp(email, password, {
+      await signUp(email.trim(), password, {
         fullName: fullName.trim(),
         country,
         ethnicity: ethnicity.trim() || undefined,
-        role: userRole
+        role: userRole,
       });
+
       router.replace({
         pathname: '/(auth)/verify-email',
-        params: { email },
+        params: { email: email.trim() },
       });
-    } catch (error) {
-      // Error is already set in store
+    } catch {
+      // Error is already handled by useAuthStore.
     }
   };
 
   const displayError = validationError || error;
 
   return (
-    <ScreenContainer 
-    containerClassName="bg-background" 
-    safeAreaClassName="bg-background">
+    <ScreenContainer
+      containerClassName="bg-background"
+      safeAreaClassName="bg-background"
+    >
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 50 : 0}
-        style={{ flex: 1 }}
+        className="flex-1"
       >
         <ScrollView
-          contentContainerStyle={{ flexGrow: 1 }}
           showsVerticalScrollIndicator={false}
           className="flex-1"
+          contentContainerStyle={{
+            flexGrow: 1,
+            paddingHorizontal: 20,
+            paddingTop: 28,
+            paddingBottom: Math.max(insets.bottom, 28),
+          }}
         >
-          <View className="flex-1 justify-center px-6 py-8 mb-5">
-            {/* Header */}
-            <View className="mb-8 items-center">
-              <Text className="text-4xl font-bold text-foreground mb-2">Create Account</Text>
-              <Text className="text-base text-muted text-center">
-                Join Fambound and build your family's shared identity
+          <View className="flex-1 justify-center">
+            {/* Page introduction */}
+            <View className="mb-7">
+              <View
+                style={{
+                  backgroundColor: `${colors.primary}14`,
+                  borderColor: `${colors.primary}28`,
+                }}
+                className="mb-5 h-14 w-14 items-center justify-center rounded-2xl border"
+              >
+                <Ionicons
+                  name="people-outline"
+                  size={28}
+                  color={colors.primary}
+                />
+              </View>
+
+              <Text className="text-[10px] font-black uppercase tracking-[1.7px] text-muted">
+                Start your family space
+              </Text>
+
+              <Text className="mt-1 text-3xl font-black tracking-tight text-foreground">
+                Create your account
+              </Text>
+
+              <Text className="mt-2 max-w-[330px] text-sm leading-5 text-muted">
+                Join Fambound and build your family&apos;s shared identity.
               </Text>
             </View>
 
-            {/* Error Message */}
             {displayError && (
-              <View className="mb-6 p-4 bg-error/10 rounded-lg border border-error/20">
-                <Text className="text-sm text-error font-medium">{displayError}</Text>
-              </View>
+              <ErrorNotice message={displayError} />
             )}
 
-            {/* Email Input */}
-            <View className="mb-4">
-              <Text className="text-sm font-semibold text-foreground mb-2">Full Name</Text>
-              <TextInput
-                placeholder="John Doe"
-                placeholderTextColor={colors.muted}
-                value={fullName}
-                onChangeText={setFullName}
-                editable={!loading}
-                autoCapitalize="words"
-                className="bg-surface border border-border rounded-lg px-4 py-3 text-foreground text-base"
-                style={{ color: colors.foreground, borderColor: colors.border, backgroundColor: colors.surface }}
-              />
-            </View>
-            <View className="mb-4">
-              <Text className="text-sm font-semibold text-foreground mb-2">Email</Text>
-              <TextInput
-                placeholder="you@example.com"
-                placeholderTextColor={colors.muted}
-                value={email}
-                onChangeText={setEmail}
-                editable={!loading}
-                autoCapitalize="none"
-                keyboardType="email-address"
-                className="bg-surface border border-border rounded-lg px-4 py-3 text-foreground text-base"
-                style={{
-                  color: colors.foreground,
-                  borderColor: colors.border,
-                  backgroundColor: colors.surface,
-                }}
-              />
-            </View>
+            {/* Account details */}
+            <View
+              style={{
+                backgroundColor: colors.surface,
+                borderColor: colors.border,
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 7 },
+                shadowOpacity: 0.07,
+                shadowRadius: 16,
+                elevation: 3,
+              }}
+              className="rounded-[26px] border px-5 py-5"
+            >
+              <View className="mb-5 flex-row items-center">
+                <View
+                  style={{ backgroundColor: `${colors.primary}14` }}
+                  className="mr-3 h-10 w-10 items-center justify-center rounded-xl"
+                >
+                  <Ionicons
+                    name="person-add-outline"
+                    size={20}
+                    color={colors.primary}
+                  />
+                </View>
 
-            <View className="mb-8">
-              <Text className="text-sm font-semibold text-foreground mb-3">Role</Text>
-              <View className="flex-row gap-2">
-                {["father", "mother"].map((role) => (
-                  <Pressable
-                    key={role}
-                    onPress={() => setUserRole(role)}
-                    className={`flex-1 py-2 px-3 rounded-lg border capitalize ${
-                      userRole === role ? 'border-primary' : 'border-border'
-                    }`}
-                    style={{
-                      backgroundColor: userRole === role ? colors.primary : colors.surface,
-                    }}
-                  >
-                    <Text
-                      className={`text-center font-semibold ${
-                        userRole === role ? 'text-white' : 'text-foreground'
-                      }`}
-                    >
-                      {role}
-                    </Text>
-                  </Pressable>
-                ))}
+                <View className="flex-1">
+                  <Text className="text-base font-black text-foreground">
+                    Your details
+                  </Text>
+
+                  <Text className="mt-1 text-xs text-muted">
+                    Tell us a little about yourself.
+                  </Text>
+                </View>
               </View>
-            </View>
 
-            {/* Country Select */}
-            <View className="mb-4">
-              <Text className="text-sm font-semibold text-foreground mb-2">Country</Text>
-              <TouchableOpacity
+              {/* Full name */}
+              <Text className="mb-2 text-[10px] font-black uppercase tracking-[1.3px] text-muted">
+                Full name
+              </Text>
+
+              <View
+                style={{
+                  backgroundColor: colors.background,
+                  borderColor: colors.border,
+                }}
+                className="mb-4 flex-row items-center rounded-2xl border px-4"
+              >
+                <Ionicons
+                  name="person-outline"
+                  size={18}
+                  color={colors.muted}
+                />
+
+                <TextInput
+                  placeholder="John Doe"
+                  placeholderTextColor={colors.muted}
+                  value={fullName}
+                  onChangeText={setFullName}
+                  editable={!loading}
+                  autoCapitalize="words"
+                  autoCorrect={false}
+                  style={{
+                    flex: 1,
+                    color: colors.foreground,
+                    fontSize: 14,
+                    paddingVertical: 15,
+                    paddingHorizontal: 12,
+                  }}
+                />
+              </View>
+
+              {/* Email */}
+              <Text className="mb-2 text-[10px] font-black uppercase tracking-[1.3px] text-muted">
+                Email address
+              </Text>
+
+              <View
+                style={{
+                  backgroundColor: colors.background,
+                  borderColor: colors.border,
+                }}
+                className="mb-4 flex-row items-center rounded-2xl border px-4"
+              >
+                <Ionicons
+                  name="mail-outline"
+                  size={18}
+                  color={colors.muted}
+                />
+
+                <TextInput
+                  placeholder="you@example.com"
+                  placeholderTextColor={colors.muted}
+                  value={email}
+                  onChangeText={setEmail}
+                  editable={!loading}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  keyboardType="email-address"
+                  style={{
+                    flex: 1,
+                    color: colors.foreground,
+                    fontSize: 14,
+                    paddingVertical: 15,
+                    paddingHorizontal: 12,
+                  }}
+                />
+              </View>
+
+              {/* Role */}
+              <Text className="mb-2 text-[10px] font-black uppercase tracking-[1.3px] text-muted">
+                Your family role
+              </Text>
+
+              <View className="mb-5 flex-row gap-2.5">
+                {['father', 'mother'].map((role) => {
+                  const selected = userRole === role;
+
+                  return (
+                    <Pressable
+                      key={role}
+                      onPress={() => setUserRole(role)}
+                      disabled={loading}
+                      style={({
+                        backgroundColor: selected
+                          ? colors.primary
+                          : colors.background,
+                        borderColor: selected
+                          ? colors.primary
+                          : colors.border,
+                      })}
+                      className="flex-1 flex-row items-center justify-center rounded-2xl border py-3.5"
+                    >
+                      <Ionicons
+                        name={
+                          role === 'father'
+                            ? 'man-outline'
+                            : 'woman-outline'
+                        }
+                        size={17}
+                        color={selected ? '#FFFFFF' : colors.primary}
+                      />
+
+                      <Text
+                        style={{
+                          color: selected
+                            ? '#FFFFFF'
+                            : colors.foreground,
+                        }}
+                        className="ml-2 text-sm font-black capitalize"
+                      >
+                        {role}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+
+              {/* Country */}
+              <Text className="mb-2 text-[10px] font-black uppercase tracking-[1.3px] text-muted">
+                Country
+              </Text>
+
+              <Pressable
                 onPress={() => setCountryModalVisible(true)}
                 disabled={loading}
-                className="bg-surface border border-border rounded-lg px-4 py-3"
-                style={{ borderColor: colors.border, backgroundColor: colors.surface }}
+                style={({ pressed }) => ({
+                  backgroundColor: colors.background,
+                  // borderColor: colors.border,
+                  opacity: pressed ? 0.75 : 1,
+                })}
+                className="mb-4 flex-row items-center justify-between rounded-2xl border border-gray-300 px-4 py-3.5"
               >
-                <Text className={country ? 'text-foreground text-base' : 'text-muted text-base'}>
-                  {country || 'Select your country'}
+                <View className="flex-row items-center">
+                  <Ionicons
+                    name="globe-outline"
+                    size={18}
+                    color={colors.muted}
+                  />
+
+                  <Text
+                    className={`ml-3 text-sm ${
+                      country
+                        ? 'text-foreground'
+                        : 'text-muted'
+                    }`}
+                  >
+                    {country || 'Select your country'}
+                  </Text>
+                </View>
+
+                <Ionicons
+                  name="chevron-down"
+                  size={17}
+                  color={colors.muted}
+                />
+              </Pressable>
+
+              {/* Ethnicity */}
+              <Text className="mb-2 text-[10px] font-black uppercase tracking-[1.3px] text-muted">
+                Ethnicity{' '}
+                <Text className="font-medium text-muted">
+                  (optional)
                 </Text>
-              </TouchableOpacity>
+              </Text>
+
+              <View className="mb-5">
+                <TextInput
+                  placeholder="e.g. Yoruba, Igbo, Fulani"
+                  placeholderTextColor={colors.muted}
+                  value={ethnicity}
+                  onChangeText={setEthnicity}
+                  editable={!loading}
+                  autoCorrect={false}
+                  style={{
+                    backgroundColor: colors.background,
+                    borderColor: colors.border,
+                    color: colors.foreground,
+                  }}
+                  className="rounded-2xl border px-4 py-3.5 text-sm"
+                />
+              </View>
+
+              {/* Password */}
+              <PasswordField
+                label="Password"
+                value={password}
+                placeholder="Minimum 8 characters"
+                visible={showPassword}
+                onChangeText={setPassword}
+                onToggleVisibility={() =>
+                  setShowPassword((previous) => !previous)
+                }
+                disabled={loading}
+                hint="Use at least 8 characters."
+                colors={colors}
+              />
+
+              {/* Confirm password */}
+              <PasswordField
+                label="Confirm password"
+                value={confirmPassword}
+                placeholder="Re-enter your password"
+                visible={showConfirmPassword}
+                onChangeText={setConfirmPassword}
+                onToggleVisibility={() =>
+                  setShowConfirmPassword((previous) => !previous)
+                }
+                disabled={loading}
+                colors={colors}
+              />
+
+              <View
+                style={{
+                  backgroundColor: `${colors.primary}08`,
+                  borderColor: `${colors.primary}20`,
+                }}
+                className="mb-5 flex-row items-start rounded-2xl border px-3.5 py-3"
+              >
+                <Ionicons
+                  name="shield-checkmark-outline"
+                  size={16}
+                  color={colors.primary}
+                />
+
+                <Text className="ml-2 flex-1 text-[11px] leading-4 text-muted">
+                  Your email will need to be verified before you can sign in.
+                </Text>
+              </View>
+
+              {/* Create account */}
+              <Pressable
+                onPress={handleSignUp}
+                disabled={loading}
+                style={({
+                  backgroundColor: colors.primary,
+                  opacity: loading ? 0.6 : 1,
+                  shadowColor: colors.primary,
+                  shadowOffset: { width: 0, height: 6 },
+                  shadowOpacity: 0.22,
+                  shadowRadius: 12,
+                  elevation: 4,
+                })}
+                className="flex-row items-center justify-center rounded-2xl py-4"
+              >
+                {loading ? (
+                  <ActivityIndicator color="#FFFFFF" />
+                ) : (
+                  <>
+                    <Ionicons
+                      name="person-add-outline"
+                      size={19}
+                      color="#FFFFFF"
+                    />
+
+                    <Text className="ml-2 text-sm font-black text-white">
+                      Create Account
+                    </Text>
+
+                    <Ionicons
+                      name="arrow-forward"
+                      size={17}
+                      color="#FFFFFF"
+                      style={{ marginLeft: 8 }}
+                    />
+                  </>
+                )}
+              </Pressable>
             </View>
 
-            {/* Ethnicity (optional) */}
-            <View className="mb-6">
-              <Text className="text-sm font-semibold text-foreground mb-2">
-                Ethnicity <Text className="text-muted font-normal">(optional)</Text>
+            {/* Join existing family */}
+            <View className="mt-6 flex-row items-center">
+              <View
+                style={{ backgroundColor: colors.border }}
+                className="h-px flex-1"
+              />
+
+              <Text className="mx-3 text-[10px] font-black uppercase tracking-wider text-muted">
+                Already part of a family?
               </Text>
-              <TextInput
-                placeholder=""
-                placeholderTextColor={colors.muted}
-                value={ethnicity}
-                onChangeText={setEthnicity}
-                editable={!loading}
-                className="bg-surface border border-border rounded-lg px-4 py-3 text-foreground text-base"
-                style={{ color: colors.foreground, borderColor: colors.border, backgroundColor: colors.surface }}
+
+              <View
+                style={{ backgroundColor: colors.border }}
+                className="h-px flex-1"
               />
             </View>
 
-            {/* Password Input */}
-            <View className="mb-4">
-              <Text className="mb-2 text-sm font-semibold text-foreground">
-                Password
-              </Text>
-
-              <View
-                className="flex-row items-center rounded-lg border border-border bg-surface px-4"
-                style={{
-                  borderColor: colors.border,
-                  backgroundColor: colors.surface,
-                }}
-              >
-                <TextInput
-                  placeholder="••••••••"
-                  placeholderTextColor={colors.muted}
-                  value={password}
-                  onChangeText={setPassword}
-                  editable={!loading}
-                  secureTextEntry={!showPassword}
-                  className="flex-1 py-4 text-base text-foreground"
-                  style={{
-                    color: colors.foreground,
-                  }}
-                />
-
-                <TouchableOpacity
-                  onPress={() => setShowPassword((prev) => !prev)}
-                  disabled={loading}
-                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                >
-                  <Ionicons
-                    name={showPassword ? "eye-off-outline" : "eye-outline"}
-                    size={22}
-                    color={colors.muted}
-                  />
-                </TouchableOpacity>
-              </View>
-
-              <Text className="mt-1 text-xs text-muted">
-                At least 8 characters
-              </Text>
-            </View>
-
-            {/* Confirm Password Input */}
-            <View className="mb-6">
-              <Text className="mb-2 text-sm font-semibold text-foreground">
-                Confirm Password
-              </Text>
-
-              <View
-                className="flex-row items-center rounded-lg border border-border bg-surface px-4"
-                style={{
-                  borderColor: colors.border,
-                  backgroundColor: colors.surface,
-                }}
-              >
-                <TextInput
-                  placeholder="••••••••"
-                  placeholderTextColor={colors.muted}
-                  value={confirmPassword}
-                  onChangeText={setConfirmPassword}
-                  editable={!loading}
-                  secureTextEntry={!showConfirmPassword}
-                  className="flex-1 py-4 text-base text-foreground"
-                  style={{
-                    color: colors.foreground,
-                  }}
-                />
-
-                <TouchableOpacity
-                  onPress={() => setShowConfirmPassword((prev) => !prev)}
-                  disabled={loading}
-                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                >
-                  <Ionicons
-                    name={showConfirmPassword ? "eye-off-outline" : "eye-outline"}
-                    size={22}
-                    color={colors.muted}
-                  />
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            {/* Sign Up Button */}
-            <TouchableOpacity
-            onPress={handleSignUp}
-              disabled={loading}
-            className='py-4 items-center bg-primary rounded-lg mb-3'>
-                {loading ? (
-                  <ActivityIndicator color={"#fff"} />
-                ) : (
-                  <Text className='text-foreground text-base font-semibold'>
-                    Create Account
-                  </Text>
-                )}
-            </TouchableOpacity>
-
-            {/* Divider */}
-            <View className="flex-row items-center mb-2">
-              <View className="flex-1 h-px bg-border" />
-              <Text className="mx-3 text-sm text-muted">Or</Text>
-              <View className="flex-1 h-px bg-border" />
-            </View>
-
-            <TouchableOpacity
+            <Pressable
               onPress={() => router.push('/(auth)/join-family')}
-              className="py-3 px-4 border border-primary rounded-lg mb-4"
+              style={({ pressed }) => ({
+                backgroundColor: colors.surface,
+                borderColor: `${colors.primary}45`,
+                opacity: pressed ? 0.72 : 1,
+              })}
+              className="mt-5 flex-row items-center justify-center rounded-2xl border py-3.5"
             >
-              <Text className="text-primary text-center text-sm font-semibold">Join a Family</Text>
-            </TouchableOpacity>
+              <Ionicons
+                name="people-outline"
+                size={18}
+                color={colors.primary}
+              />
 
-            {/* OAuth Buttons */}
-            {/* <View className="gap-3 mb-6">
-              <Pressable
-                disabled={loading}
-                style={({ pressed }) => [
-                  { backgroundColor: colors.surface, borderColor: colors.border },
-                  pressed && { opacity: 0.7 },
-                ]}
-                className="flex-row items-center justify-center border rounded-lg py-3"
+              <Text
+                style={{ color: colors.primary }}
+                className="ml-2 text-sm font-black"
               >
-                <Text className="text-base font-semibold text-foreground">🍎 Sign up with Apple</Text>
-              </Pressable>
+                Join a Family
+              </Text>
+            </Pressable>
 
-              <Pressable
-                disabled={loading}
-                style={({ pressed }) => [
-                  { backgroundColor: colors.surface, borderColor: colors.border },
-                  pressed && { opacity: 0.7 },
-                ]}
-                className="flex-row items-center justify-center border rounded-lg py-3"
-              >
-                <Text className="text-base font-semibold text-foreground">🔵 Sign up with Google</Text>
-              </Pressable>
-            </View> */}
+            {/* Sign-in link */}
+            <View className="mt-7 flex-row items-center justify-center">
+              <Text className="text-xs font-medium text-muted">
+                Already have an account?{' '}
+              </Text>
 
-            {/* Sign In Link */}
-            <View className="flex-row justify-center items-center"
-            style={{ paddingBottom: Math.max(insets.bottom, 14) }}>
-              <Text className="text-sm text-muted">Already have an account? </Text>
               <Link href="/(auth)/sign-in" asChild>
-                <Pressable>
-                  <Text className="text-sm font-semibold text-primary">Sign in</Text>
+                <Pressable
+                  style={({ pressed }) => ({
+                    opacity: pressed ? 0.55 : 1,
+                  })}
+                >
+                  <Text
+                    style={{ color: colors.primary }}
+                    className="text-xs font-black"
+                  >
+                    Sign in
+                  </Text>
                 </Pressable>
               </Link>
             </View>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
       <CountryPickerModal
         visible={countryModalVisible}
         selected={country}

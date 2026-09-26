@@ -114,13 +114,29 @@ serve(async (req) => {
     // ── 3. Roster + dietary ──────────────────────────────────────
     const { data: members } = await supabase
       .from('member')
-      .select('id, name, role, age_band, dietary_notes')
+      .select('id, name, role, age_band, dietary_notes, user_id, temperament_type, productivity_energy, sharing_preference')
       .eq('family_id', family_id);
 
     const roster = (members ?? []).map((m) => `${m.name} (${m.role}${m.age_band ? `, ${m.age_band}` : ''})`).join(', ') || 'not yet added';
     const dietaryNotes = (members ?? []).filter((m) => m.dietary_notes?.trim()).map((m) => `${m.name}: ${m.dietary_notes}`).join('\n') || 'None recorded.';
     const currentMember = (members ?? []).find((m) => m.user_id === user_id);
     const currentUserIsEditor = isAdminAccess(currentMember?.role);
+
+    // Know Your Family context — brief section 21: only members who
+    // opted into family-level sharing are included, plus the asker's
+    // own profile even if private (it's their own data, and this
+    // response is only seen by them).
+    const knowYourFamilyMembers = (members ?? []).filter(
+      (m) =>
+        m.temperament_type &&
+        m.productivity_energy &&
+        (m.sharing_preference === 'family' || m.user_id === user_id),
+    );
+    const knowYourFamilyContext = knowYourFamilyMembers.length
+      ? knowYourFamilyMembers
+          .map((m) => `${m.name}: ${m.temperament_type} temperament, ${m.productivity_energy} energy`)
+          .join('\n')
+      : 'No family members have shared a Know Your Family profile yet.';
 
     // ── 4. Meal plan ──────────────────────────────────────────────
     const { data: currentPlan } = await supabase
@@ -225,6 +241,11 @@ Family Values: ${familyCharter?.values}.
 
 Dietary restrictions (never suggest anything that conflicts with these):
 ${dietaryNotes}
+
+Know Your Family profiles (temperament + productivity energy). Only members listed here have shared theirs — never state or guess a type for anyone not listed, and never imply someone who isn't listed simply hasn't taken the assessment vs. having kept it private:
+${knowYourFamilyContext}
+
+Use this naturally when it genuinely helps — e.g. suggesting who might enjoy leading a task, or noting how two people's styles might work well together — in the same warm, exploratory language the app uses ("may naturally", "may prefer"). Don't force it into replies where it doesn't fit, and never use it to rank or compare family members' worth.
 
 This week's meal plan:
 ${mealPlanContext}

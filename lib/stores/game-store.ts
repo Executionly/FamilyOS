@@ -12,6 +12,16 @@ export interface GameQuestion {
   explanation?: string;
 }
 
+type GameType = 'bible_trivia' | 'quiz';
+ 
+export interface StartOptions {
+  difficulty?: 'easy' | 'medium' | 'hard';
+  category?: string;
+  count?: number;
+  /** "Know Our Family". Only honoured when gameType === 'quiz'. */
+  familySpecific?: boolean;
+}
+
 export interface GameParticipant {
   id: string;
   member_id: string;
@@ -22,7 +32,7 @@ export interface GameParticipant {
 export interface GameSession {
   id: string;
   family_id: string;
-  game_type: 'bible_trivia' | 'quiz';
+  game_type: GameType;
   mode: 'solo' | 'multiplayer';
   status: 'waiting' | 'in_progress' | 'completed' | 'cancelled' | 'paused';
   question_ids: string[];
@@ -34,6 +44,52 @@ export interface GameSession {
   created_by: string;
 }
 
+// `kind` property instead of a class + instanceof: subclassed Errors can lose their prototype under some RN/Babel transforms.
+const startError = (kind: 'daily_limit' | 'charter_required') =>
+  Object.assign(new Error(kind), { kind });
+ 
+const isFamilyQuiz = (gameType: GameType, options?: StartOptions) =>
+  gameType === 'quiz' && !!options?.familySpecific;
+ 
+async function fetchQuestionIds(
+  familyId: string,
+  gameType: GameType,
+  options?: StartOptions,
+): Promise<string[]> {
+  const family = isFamilyQuiz(gameType, options);
+  const { familySpecific: _ignored, ...rest } = options ?? {};
+ 
+  const { data, error } = await supabase.functions.invoke(
+    family ? 'generate-family-quiz' : 'generate-game-questions',
+    {
+      // The family quiz has no difficulty/category: it is built from the family's own charter.
+      body: family
+        ? { family_id: familyId, count: rest.count }
+        : { family_id: familyId, game_type: gameType, ...rest },
+    },
+  );
+ 
+  if (error) {
+    const status = (error as any)?.context?.status;
+    if (status === 429) throw startError('daily_limit');
+    if (status === 422) throw startError('charter_required');
+    throw error;
+  }
+  if (!data?.question_ids?.length) throw new Error('No questions available');
+  return data.question_ids as string[];
+}
+ 
+const startFailure = (error: unknown) => {
+  const kind = (error as any)?.kind;
+  if (kind === 'daily_limit') return { dailyLimitReached: true, loading: false };
+  if (kind === 'charter_required') return { charterRequired: true, loading: false };
+  return { error: error instanceof Error ? error.message : 'Failed to start game', loading: false };
+};
+ 
+const gameLabelFor = (gameType: GameType, options?: StartOptions) =>
+  isFamilyQuiz(gameType, options) ? 'Know Our Family' : gameType === 'bible_trivia' ? 'Bible Trivia' : 'General Quiz';
+ 
+
 interface GameState {
   currentSession: GameSession | null;
   questions: GameQuestion[];
@@ -41,6 +97,7 @@ interface GameState {
   loading: boolean;
   error: string | null;
   dailyLimitReached: boolean;
+  charterRequired: boolean;
   channel: ReturnType<typeof supabase.channel> | null;
 
   startSession: (
@@ -73,97 +130,178 @@ export const useGameStore = create<GameState>((set, get) => ({
   error: null,
   dailyLimitReached: false,
   channel: null,
+  charterRequired: false,
 
   // startSession — multiplayer now creates in 'waiting' status, not 'in_progress'
-  startSession: async (familyId, createdBy, memberId, gameType, mode, options) => {
-    set({ loading: true, error: null, dailyLimitReached: false });
-    try {
-      const { data, error } = await supabase.functions.invoke('generate-game-questions', {
-        body: { family_id: familyId, game_type: gameType, ...options },
-      });
-
-      if (error) {
-        const status = (error as any)?.context?.status;
-        if (status === 429) {
-          set({ dailyLimitReached: true, loading: false });
-          return null;
-        }
-        throw error;
-      }
-
-      const questionIds = data.question_ids;
-      const isMultiplayer = mode === 'multiplayer';
-
-      const { data: session, error: sessionError } = await supabase
-        .from('game_session')
-        .insert([{
-          family_id: familyId, game_type: gameType, mode,
-          question_ids: questionIds, created_by: createdBy,
-          status: isMultiplayer ? 'waiting' : 'in_progress',
-          question_started_at: isMultiplayer ? null : new Date().toISOString(),
-        }])
-        .select()
-        .single();
-      if (sessionError) throw sessionError;
-
-      const { data: participant, error: participantError } = await supabase
-        .from('game_participant')
-        .insert([{ session_id: session.id, member_id: memberId }])
-        .select()
-        .single();
-      if (participantError) throw participantError;
-
-      const { data: questions } = await supabase
-        .from('game_question')
-        .select('id, question, options, explanation')
-        .in('id', questionIds);
-
-      const orderedQuestions = questionIds.map((id: string) => questions?.find((q) => q.id === id)).filter(Boolean);
-
-      set({
-        currentSession: session,
-        questions: orderedQuestions,
-        participants: [{ ...participant, member: undefined }],
-        loading: false,
-      });
-
-      return session;
-    } catch (error) {
-      set({ error: error instanceof Error ? error.message : 'Failed to start game', loading: false });
-      return null;
-    }
-  },
-
-  // startFamilyQuiz: async (familyId: string, createdBy: string, memberId: string, mode: 'solo' | 'multiplayer') => {
-  //   set({ loading: true, error: null });
+  // startSession: async (familyId, createdBy, memberId, gameType, mode, options) => {
+  //   set({ loading: true, error: null, dailyLimitReached: false });
   //   try {
-  //     const { data, error } = await supabase.functions.invoke('generate-family-quiz', { body: { family_id: familyId } });
+  //     const { data, error } = await supabase.functions.invoke('generate-game-questions', {
+  //       body: { family_id: familyId, game_type: gameType, ...options },
+  //     });
+
   //     if (error) {
   //       const status = (error as any)?.context?.status;
-  //       if (status === 422) { set({ error: 'Set up your Family Charter first to unlock this quiz.', loading: false }); return null; }
+  //       if (status === 429) {
+  //         set({ dailyLimitReached: true, loading: false });
+  //         return null;
+  //       }
   //       throw error;
   //     }
 
   //     const questionIds = data.question_ids;
-  //     const { data: session, error: sErr } = await supabase
+  //     const isMultiplayer = mode === 'multiplayer';
+
+  //     const { data: session, error: sessionError } = await supabase
   //       .from('game_session')
-  //       .insert([{ family_id: familyId, game_type: 'quiz', mode, question_ids: questionIds, created_by: createdBy, status: mode === 'multiplayer' ? 'waiting' : 'in_progress', question_started_at: mode === 'multiplayer' ? null : new Date().toISOString() }])
-  //       .select().single();
-  //     if (sErr) throw sErr;
+  //       .insert([{
+  //         family_id: familyId, game_type: gameType, mode,
+  //         question_ids: questionIds, created_by: createdBy,
+  //         status: isMultiplayer ? 'waiting' : 'in_progress',
+  //         question_started_at: isMultiplayer ? null : new Date().toISOString(),
+  //       }])
+  //       .select()
+  //       .single();
+  //     if (sessionError) throw sessionError;
 
-  //     await supabase.from('game_participant').insert([{ session_id: session.id, member_id: memberId }]);
-  //     const { data: questions } = await supabase.from('game_question').select('id, question, options, explanation').in('id', questionIds);
-  //     const ordered = questionIds.map((id: string) => questions?.find((q: any) => q.id === id)).filter(Boolean);
+  //     const { data: participant, error: participantError } = await supabase
+  //       .from('game_participant')
+  //       .insert([{ session_id: session.id, member_id: memberId }])
+  //       .select()
+  //       .single();
+  //     if (participantError) throw participantError;
 
-  //     set({ currentSession: session, questions: ordered, loading: false });
+  //     const { data: questions } = await supabase
+  //       .from('game_question')
+  //       .select('id, question, options, explanation')
+  //       .in('id', questionIds);
+
+  //     const orderedQuestions = questionIds.map((id: string) => questions?.find((q) => q.id === id)).filter(Boolean);
+
+  //     set({
+  //       currentSession: session,
+  //       questions: orderedQuestions,
+  //       participants: [{ ...participant, member: undefined }],
+  //       loading: false,
+  //     });
+
   //     return session;
   //   } catch (error) {
-  //     set({ error: error instanceof Error ? error.message : 'Failed to start family quiz', loading: false });
+  //     set({ error: error instanceof Error ? error.message : 'Failed to start game', loading: false });
   //     return null;
   //   }
   // },
 
-  // New — host taps "Start" in the lobby, this kicks the game off for everyone at once
+
+startSession: async (familyId, createdBy, memberId, gameType, mode, options) => {
+  set({ loading: true, error: null, dailyLimitReached: false, charterRequired: false });
+  try {
+    const questionIds = await fetchQuestionIds(familyId, gameType, options);
+    const isMultiplayer = mode === 'multiplayer';
+ 
+    const { data: session, error: sessionError } = await supabase
+      .from('game_session')
+      .insert([{
+        family_id: familyId, game_type: gameType, mode,
+        variant: isFamilyQuiz(gameType, options) ? 'family' : 'standard',
+        question_ids: questionIds, created_by: createdBy,
+        status: isMultiplayer ? 'waiting' : 'in_progress',
+        question_started_at: isMultiplayer ? null : new Date().toISOString(),
+      }])
+      .select()
+      .single();
+    if (sessionError) throw sessionError;
+ 
+    const { data: participant, error: participantError } = await supabase
+      .from('game_participant')
+      .insert([{ session_id: session.id, member_id: memberId }])
+      .select()
+      .single();
+    if (participantError) throw participantError;
+ 
+    const { data: questions } = await supabase
+      .from('game_question')
+      .select('id, question, options, explanation')
+      .in('id', questionIds);
+ 
+    const orderedQuestions = questionIds.map((id: string) => questions?.find((q) => q.id === id)).filter(Boolean);
+ 
+    set({
+      currentSession: session,
+      questions: orderedQuestions as GameQuestion[],
+      participants: [{ ...participant, member: undefined }],
+      loading: false,
+    });
+ 
+    return session;
+  } catch (error) {
+    set(startFailure(error));
+    return null;
+  }
+},
+ 
+inviteAndStart: async (familyId, createdBy, memberId, gameType, invitedMemberIds, options) => {
+  set({ loading: true, error: null, dailyLimitReached: false, charterRequired: false });
+  try {
+    const questionIds = await fetchQuestionIds(familyId, gameType, options);
+ 
+    const { data: session, error: sErr } = await supabase
+      .from('game_session')
+      .insert([{
+        family_id: familyId, game_type: gameType, mode: 'multiplayer',
+        variant: isFamilyQuiz(gameType, options) ? 'family' : 'standard',
+        question_ids: questionIds, created_by: createdBy,
+        status: 'waiting', invited_member_ids: invitedMemberIds,
+        lobby_deadline: new Date(Date.now() + 90000).toISOString(),
+      }])
+      .select().single();
+    if (sErr) throw sErr;
+ 
+    const { data: participant, error: pErr } = await supabase
+      .from('game_participant')
+      .insert([{ session_id: session.id, member_id: memberId }])
+      .select()
+      .single();
+    if (pErr) throw pErr;
+ 
+    const { data: questions } = await supabase
+      .from('game_question')
+      .select('id, question, options, explanation')
+      .in('id', questionIds);
+    const ordered = questionIds.map((id: string) => questions?.find((q) => q.id === id)).filter(Boolean);
+ 
+    const label = gameLabelFor(gameType, options);
+    for (const invitedId of invitedMemberIds) {
+      await notifyAssignment({
+        familyId,
+        assigneeMemberId: invitedId,
+        type: 'family_update',
+        priority: 'important',
+        assigneeMessage: {
+          title: "You've been invited to play",
+          body: `You've been invited to play ${label}.`,
+        },
+        othersMessage: {
+          title: 'Game invitation sent',
+          body: `A family member has been invited to play ${label}.`,
+        },
+        actionLabel: 'Go to lobby',
+        actionRoute: `/(stack)/games/lobby?sessionId=${session.id}`,
+      });
+    }
+ 
+    set({
+      currentSession: session,
+      questions: ordered as GameQuestion[],
+      loading: false,
+      participants: [{ ...participant, member: undefined }],
+    });
+    return session;
+  } catch (error) {
+    set(startFailure(error));
+    return null;
+  }
+},
   
   beginMultiplayerGame: async (sessionId: string) => {
     const { data, error } = await supabase
@@ -261,70 +399,70 @@ export const useGameStore = create<GameState>((set, get) => ({
   return data ?? null;
 },
 
-inviteAndStart: async (familyId, createdBy, memberId, gameType, invitedMemberIds, options) => {
-  set({ loading: true, error: null, dailyLimitReached: false });
-  try {
-    const { data, error } = await supabase.functions.invoke('generate-game-questions', {
-      body: { family_id: familyId, game_type: gameType, ...options },
-    });
-    if (error) {
-      const status = (error as any)?.context?.status;
-      if (status === 429) { set({ dailyLimitReached: true, loading: false }); return null; }
-      throw error;
-    }
+// inviteAndStart: async (familyId, createdBy, memberId, gameType, invitedMemberIds, options) => {
+//   set({ loading: true, error: null, dailyLimitReached: false });
+//   try {
+//     const { data, error } = await supabase.functions.invoke('generate-game-questions', {
+//       body: { family_id: familyId, game_type: gameType, ...options },
+//     });
+//     if (error) {
+//       const status = (error as any)?.context?.status;
+//       if (status === 429) { set({ dailyLimitReached: true, loading: false }); return null; }
+//       throw error;
+//     }
 
-    const { data: session, error: sErr } = await supabase
-      .from('game_session')
-      .insert([{
-        family_id: familyId, game_type: gameType, mode: 'multiplayer',
-        question_ids: data.question_ids, created_by: createdBy,
-        status: 'waiting', invited_member_ids: invitedMemberIds,
-        lobby_deadline: new Date(Date.now() + 90000).toISOString(),
-      }])
-      .select().single();
-    if (sErr) throw sErr;
+//     const { data: session, error: sErr } = await supabase
+//       .from('game_session')
+//       .insert([{
+//         family_id: familyId, game_type: gameType, mode: 'multiplayer',
+//         question_ids: data.question_ids, created_by: createdBy,
+//         status: 'waiting', invited_member_ids: invitedMemberIds,
+//         lobby_deadline: new Date(Date.now() + 90000).toISOString(),
+//       }])
+//       .select().single();
+//     if (sErr) throw sErr;
 
-    const { data: participant, error: pErr } = await supabase
-      .from('game_participant')
-      .insert([{ session_id: session.id, member_id: memberId }])
-      .select()
-      .single();
-    if (pErr) throw pErr;
+//     const { data: participant, error: pErr } = await supabase
+//       .from('game_participant')
+//       .insert([{ session_id: session.id, member_id: memberId }])
+//       .select()
+//       .single();
+//     if (pErr) throw pErr;
 
-    const { data: questions } = await supabase.from('game_question').select('id, question, options, explanation').in('id', data.question_ids);
-    const ordered = data.question_ids.map((id: string) => questions?.find((q) => q.id === id)).filter(Boolean);
+//     const { data: questions } = await supabase.from('game_question').select('id, question, options, explanation').in('id', data.question_ids);
+//     const ordered = data.question_ids.map((id: string) => questions?.find((q) => q.id === id)).filter(Boolean);
 
-    for (const invitedId of invitedMemberIds) {
-      await notifyAssignment({
-        familyId,
-        assigneeMemberId: invitedId,
-        type: 'family_update',
-        priority: 'important',
-        assigneeMessage: {
-          title: 'You\'ve been invited to play',
-          body: `You've been invited to join a ${gameType} game.`,
-        },
-        othersMessage: {
-          title: 'Game invitation sent',
-          body: `A family member has been invited to join a ${gameType} game.`,
-        },
-        actionLabel: 'Go to lobby',
-        actionRoute: `/(stack)/games/lobby?sessionId=${session.id}`,
-      });
-    }
+//     for (const invitedId of invitedMemberIds) {
+//       await notifyAssignment({
+//         familyId,
+//         assigneeMemberId: invitedId,
+//         type: 'family_update',
+//         priority: 'important',
+//         assigneeMessage: {
+//           title: 'You\'ve been invited to play',
+//           body: `You've been invited to join a ${gameType} game.`,
+//         },
+//         othersMessage: {
+//           title: 'Game invitation sent',
+//           body: `A family member has been invited to join a ${gameType} game.`,
+//         },
+//         actionLabel: 'Go to lobby',
+//         actionRoute: `/(stack)/games/lobby?sessionId=${session.id}`,
+//       });
+//     }
 
-    set({
-      currentSession: session,
-      questions: ordered,
-      loading: false,
-      participants: [{ ...participant, member: undefined }],
-    });
-    return session;
-  } catch (error) {
-    set({ error: error instanceof Error ? error.message : 'Failed to start game', loading: false });
-    return null;
-  }
-},
+//     set({
+//       currentSession: session,
+//       questions: ordered,
+//       loading: false,
+//       participants: [{ ...participant, member: undefined }],
+//     });
+//     return session;
+//   } catch (error) {
+//     set({ error: error instanceof Error ? error.message : 'Failed to start game', loading: false });
+//     return null;
+//   }
+// },
 
 cancelSession: async (sessionId: string) => {
   await supabase.from('game_session').update({ status: 'cancelled' }).eq('id', sessionId);

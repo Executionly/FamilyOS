@@ -13,7 +13,18 @@ import { supabase } from '@/lib/_core/supabase';
 
 const FEATURES = [
   { icon: 'sparkles', text: 'AI Family Assistant that manages your calendar, tasks & more' },
-  { icon: 'bulb-outline', text: 'Personalized family recommendations & insights' },
+  {
+    icon: 'game-controller-outline',
+    text: 'Unlimited Family Games — trivia & quizzes (free: 5 plays a day)',
+  },
+  {
+    icon: 'flag-outline',
+    text: 'AI-personalized Family Challenges with unlimited suggestions (free: one template challenge at a time)',
+  },
+  {
+    icon: 'people-outline',
+    text: 'Deep Family Dynamics insights from Know Your Family — how your strengths and differences fit together',
+  },
   { icon: 'people-circle-outline', text: 'AI-assisted family meetings & agendas' },
   { icon: 'compass-outline', text: 'Family mission, vision & values builder' },
   { icon: 'book-outline', text: 'Full family legacy & story building tools' },
