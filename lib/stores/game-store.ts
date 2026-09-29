@@ -12,7 +12,7 @@ export interface GameQuestion {
   explanation?: string;
 }
 
-type GameType = 'bible_trivia' | 'quiz';
+type GameType = 'bible_trivia' | 'quiz' | 'family_feud';
  
 export interface StartOptions {
   difficulty?: 'easy' | 'medium' | 'hard';

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { View, Text, Pressable, ScrollView, ActivityIndicator, Image, TouchableOpacity } from 'react-native';
-import { useRouter, useSegments } from 'expo-router';
+import { RelativePathString, useRouter, useSegments } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { ScreenContainer } from '@/components/screen-container';
 import { AppHeader } from '@/components/app-header';
@@ -10,6 +10,7 @@ import { useAuthStore } from '@/lib/stores/auth-store';
 import { GameSession, useGameStore } from '@/lib/stores/game-store';
 import { GAME_META } from '@/constants/games';
 import { MemberAvatar } from '@/components/ui/member-avatar';
+import { useFeudStore } from '@/lib/stores/useFeudStore';
 
 const DIFFICULTY_META = {
   easy: { label: 'Easy', color: '#10B981', icon: 'leaf-outline', desc: 'Casual play' },
@@ -17,23 +18,28 @@ const DIFFICULTY_META = {
   hard: { label: 'Hard', color: '#EF4444', icon: 'flash-outline', desc: 'Expert' },
 } as const;
 
+const ROUNDS_OPTIONS = [3, 5, 7] as const;
+
+type GameKey = 'bible_trivia' | 'quiz' | 'family_feud';
+
 export default function GamesHubScreen() {
   const router = useRouter();
   const colors = useColors();
   const segment = useSegments()
-  const { family, currentMember } = useFamilyStore();
+  const { family, currentMember, members } = useFamilyStore();
   const { user } = useAuthStore();
-  const { startSession, loading, dailyLimitReached, charterRequired } = useGameStore();
+  const { startSession, loading, dailyLimitReached, charterRequired, findActiveSession, inviteAndStart } = useGameStore();
+  const { createSession: createFeudSession, loading: feudLoading, error: feudError } = useFeudStore();
 
-  const [selectedGame, setSelectedGame] = useState<'bible_trivia' | 'quiz' | null>(null);
+  const [selectedGame, setSelectedGame] = useState<GameKey | null>(null);
   const [mode, setMode] = useState<'solo' | 'multiplayer'>('solo');
   const [difficulty, setDifficulty] = useState<'easy' | 'medium' | 'hard'>('medium');
+  const [feudRounds, setFeudRounds] = useState<number>(5);
   const [invitedIds, setInvitedIds] = useState<string[]>([]);
   const [activeSession, setActiveSession] = useState<GameSession | null>(null);
-  const { members } = useFamilyStore();
-  const { findActiveSession, inviteAndStart } = useGameStore();
   const [useFamilyData, setUseFamilyData] = useState(false)
   const isPremium = family?.subscription_tier === 'premium';
+  const isFeud = selectedGame === 'family_feud';
   const familyMode = selectedGame === 'quiz' && useFamilyData;
 
   useEffect(() => {
@@ -47,11 +53,21 @@ export default function GamesHubScreen() {
 
   const handleStart = async () => {
     if (!selectedGame || !family?.id || !user?.id || !currentMember?.id) return;
-  
+
+    if (isFeud) {
+      if (invitedIds.length === 0) return;
+      const session = await createFeudSession(family.id, user.id, currentMember.id, invitedIds, {
+        totalRounds: feudRounds,
+        difficulty,
+      });
+      if (session) router.push(`/(stack)/games/feud/feud-lobby?sessionId=${session.id}`);
+      return;
+    }
+
     // familySpecific is computed from selectedGame, so toggling "Know Our Family" on and then
     // switching to Bible Trivia can't leak the flag into the wrong game.
     const options = { difficulty, count: 10, familySpecific: familyMode };
-  
+
     if (mode === 'multiplayer') {
       const session = await inviteAndStart(family.id, user.id, currentMember.id, selectedGame, invitedIds, options);
       if (session) router.push(`/(stack)/games/lobby?sessionId=${session.id}`);
@@ -61,8 +77,12 @@ export default function GamesHubScreen() {
     }
   };
 
-  const canStart = selectedGame && (mode === 'solo' || (mode === 'multiplayer' && invitedIds.length > 0));
+  const canStart = isFeud
+    ? invitedIds.length > 0
+    : selectedGame && (mode === 'solo' || (mode === 'multiplayer' && invitedIds.length > 0));
+  const isBusy = loading || feudLoading;
   const availableMembers = (members ?? []).filter((m) => m.id !== currentMember?.id);
+  const resolvedDifficultyStepNumber = isFeud ? '4' : mode === 'multiplayer' ? '4' : '3';
 
   return (
     <ScreenContainer containerClassName="bg-background" safeAreaClassName="bg-background">
@@ -168,13 +188,14 @@ export default function GamesHubScreen() {
         {/* RESUME ACTIVE SESSION */}
         {activeSession && (
           <Pressable
-            onPress={() =>
-              router.push(
-                activeSession.status === 'waiting'
-                  ? `/(stack)/games/lobby?sessionId=${activeSession.id}`
-                  : `/(stack)/games/play?sessionId=${activeSession.id}`
-              )
-            }
+            onPress={() => {
+              const isFeudSession = activeSession.game_type === 'family_feud';
+              const base = isFeudSession ? '/(stack)/games/feud' : '/(stack)/games';
+              const route = activeSession.status === 'waiting'
+                  ? `${base}/${isFeudSession ? 'feud-lobby' : 'lobby'}?sessionId=${activeSession.id}`
+                  : `${base}/${isFeudSession ? 'feud-play' : 'play'}?sessionId=${activeSession.id}` 
+              router.push(route as RelativePathString);
+            }}
             style={({ pressed }) => [
               {
                 backgroundColor: colors.surface,
@@ -205,13 +226,13 @@ export default function GamesHubScreen() {
           </View>
 
           <View className="gap-3">
-            {(Object.keys(GAME_META) as Array<keyof typeof GAME_META>).map((key) => {
+            {(Object.keys(GAME_META) as Array<keyof typeof GAME_META>).slice(0, 2).map((key) => {
               const meta = GAME_META[key];
               const selected = selectedGame === key;
               return (
                 <TouchableOpacity
                   key={key}
-                  onPress={() => setSelectedGame(key)}
+                  onPress={() => setSelectedGame(key as GameKey)}
                   style={[
                     {
                       backgroundColor: selected ? `${meta.color}08` : colors.surface,
@@ -251,60 +272,62 @@ export default function GamesHubScreen() {
 
         {selectedGame && (
           <View>
-            {/* STEP 2: MODE */}
-            <View className="mb-6">
-              <View className="flex-row items-center mb-3 ml-1">
-                <View style={{ backgroundColor: colors.primary }} className="w-5 h-5 rounded-full items-center justify-center mr-2">
-                  <Text className="text-[10px] font-black text-white">2</Text>
+            {/* STEP 2: MODE — Family Feud is multiplayer-only, so this step is skipped for it */}
+            {!isFeud && (
+              <View className="mb-6">
+                <View className="flex-row items-center mb-3 ml-1">
+                  <View style={{ backgroundColor: colors.primary }} className="w-5 h-5 rounded-full items-center justify-center mr-2">
+                    <Text className="text-[10px] font-black text-white">2</Text>
+                  </View>
+                  <Text className="text-[10px] font-black text-muted uppercase tracking-widest">Play mode</Text>
                 </View>
-                <Text className="text-[10px] font-black text-muted uppercase tracking-widest">Play mode</Text>
-              </View>
 
-              <View className="flex-row gap-3">
-                {(['solo', 'multiplayer'] as const).map((m) => {
-                  const isSelected = mode === m;
-                  const modeIcon = m === 'solo' ? 'person' : 'people';
-                  const modeDesc = m === 'solo' ? 'Just you' : 'With family';
-                  return (
-                    <TouchableOpacity
-                      key={m}
-                      onPress={() => setMode(m)}
-                      style={[
-                        {
-                          backgroundColor: isSelected ? colors.primary : colors.surface,
-                          borderColor: isSelected ? colors.primary : colors.border,
-                        },
-                      ]}
-                      className="flex-1 rounded-3xl border p-4 items-center"
-                    >
-                      <View
-                        style={{
-                          backgroundColor: isSelected ? 'rgba(255,255,255,0.2)' : colors.background,
-                        }}
-                        className="w-11 h-11 rounded-2xl items-center justify-center mb-2"
+                <View className="flex-row gap-3">
+                  {(['solo', 'multiplayer'] as const).map((m) => {
+                    const isSelected = mode === m;
+                    const modeIcon = m === 'solo' ? 'person' : 'people';
+                    const modeDesc = m === 'solo' ? 'Just you' : 'With family';
+                    return (
+                      <TouchableOpacity
+                        key={m}
+                        onPress={() => setMode(m)}
+                        style={[
+                          {
+                            backgroundColor: isSelected ? colors.primary : colors.surface,
+                            borderColor: isSelected ? colors.primary : colors.border,
+                          },
+                        ]}
+                        className="flex-1 rounded-3xl border p-4 items-center"
                       >
-                        <Ionicons name={modeIcon} size={22} color={isSelected ? '#fff' : colors.foreground} />
-                      </View>
-                      <Text
-                        style={{ color: isSelected ? '#fff' : colors.foreground }}
-                        className="text-sm font-black capitalize mb-0.5"
-                      >
-                        {m}
-                      </Text>
-                      <Text
-                        style={{ color: isSelected ? 'rgba(255,255,255,0.75)' : colors.muted }}
-                        className="text-[10px] font-semibold"
-                      >
-                        {modeDesc}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
+                        <View
+                          style={{
+                            backgroundColor: isSelected ? 'rgba(255,255,255,0.2)' : colors.background,
+                          }}
+                          className="w-11 h-11 rounded-2xl items-center justify-center mb-2"
+                        >
+                          <Ionicons name={modeIcon} size={22} color={isSelected ? '#fff' : colors.foreground} />
+                        </View>
+                        <Text
+                          style={{ color: isSelected ? '#fff' : colors.foreground }}
+                          className="text-sm font-black capitalize mb-0.5"
+                        >
+                          {m}
+                        </Text>
+                        <Text
+                          style={{ color: isSelected ? 'rgba(255,255,255,0.75)' : colors.muted }}
+                          className="text-[10px] font-semibold"
+                        >
+                          {modeDesc}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
               </View>
-            </View>
+            )}
 
-            {/* STEP 2.5: INVITE (MULTIPLAYER ONLY) */}
-            {mode === 'multiplayer' && (
+            {/* STEP 2.5: INVITE — always shown for Feud, since it's multiplayer-only */}
+            {(mode === 'multiplayer' || isFeud) && (
               <View className="mb-6">
                 <View className="flex-row items-center justify-between mb-3 ml-1">
                   <View className="flex-row items-center">
@@ -387,7 +410,45 @@ export default function GamesHubScreen() {
               </View>
             )}
 
-            {/* STEP 3: KNOW YOUR FAMILY */}
+            {/* STEP 3 (Feud only): NUMBER OF ROUNDS */}
+            {isFeud && (
+              <View className="mb-6">
+                <View className="flex-row items-center mb-3 ml-1">
+                  <View style={{ backgroundColor: colors.primary }} className="w-5 h-5 rounded-full items-center justify-center mr-2">
+                    <Text className="text-[10px] font-black text-white">3</Text>
+                  </View>
+                  <Text className="text-[10px] font-black text-muted uppercase tracking-widest">Number of rounds</Text>
+                </View>
+                <View className="flex-row gap-2.5">
+                  {ROUNDS_OPTIONS.map((r) => {
+                    const isSelected = feudRounds === r;
+                    return (
+                      <TouchableOpacity
+                        key={r}
+                        onPress={() => setFeudRounds(r)}
+                        style={[
+                          {
+                            backgroundColor: isSelected ? `${colors.primary}10` : colors.surface,
+                            borderColor: isSelected ? colors.primary : colors.border,
+                          },
+                        ]}
+                        className="flex-1 rounded-2xl border p-3 items-center"
+                      >
+                        <Text
+                          style={{ color: isSelected ? colors.primary : colors.foreground }}
+                          className="text-base font-black"
+                        >
+                          {r}
+                        </Text>
+                        <Text className="text-[9px] font-semibold text-muted">rounds</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+            )}
+
+            {/* STEP: KNOW YOUR FAMILY (quiz only) */}
             {selectedGame === 'quiz' && isPremium && <View className='mb-5'>
               <View className="flex-row items-center mb-3 ml-1">
                 <View style={{ backgroundColor: colors.primary }} className="w-5 h-5 rounded-full items-center justify-center mr-2">
@@ -409,11 +470,11 @@ export default function GamesHubScreen() {
               </Pressable>
             </View>}
 
-            {/* STEP 4: DIFFICULTY */}
+            {/* STEP: DIFFICULTY — shown for trivia/quiz and for Feud */}
             {!familyMode && <View className="mb-8">
               <View className="flex-row items-center mb-3 ml-1">
                 <View style={{ backgroundColor: colors.primary }} className="w-5 h-5 rounded-full items-center justify-center mr-2">
-                  <Text className="text-[10px] font-black text-white">{mode === 'multiplayer' ? '4' : '3'}</Text>
+                  <Text className="text-[10px] font-black text-white">{resolvedDifficultyStepNumber}</Text>
                 </View>
                 <Text className="text-[10px] font-black text-muted uppercase tracking-widest">Difficulty level</Text>
               </View>
@@ -481,10 +542,16 @@ export default function GamesHubScreen() {
               </Pressable>
             )}
 
+            {feudError && (
+              <View className="mb-4 rounded-xl border border-error p-3">
+                <Text className="text-xs text-error">{feudError}</Text>
+              </View>
+            )}
+
             {/* START BUTTON */}
             <TouchableOpacity
               onPress={handleStart}
-              disabled={loading || !canStart}
+              disabled={isBusy || !canStart}
               style={[
                 {
                   backgroundColor: canStart ? colors.primary : colors.primary,
@@ -493,24 +560,26 @@ export default function GamesHubScreen() {
               ]}
               className="flex-row items-center justify-center rounded-2xl py-4 shadow-sm"
             >
-              {loading ? (
+              {isBusy ? (
                 <ActivityIndicator color="#fff" />
               ) : (
                 <>
                   <Ionicons name="rocket" size={18} color="#fff" />
                   <Text className="ml-2 text-base font-black text-white tracking-wide">
-                    {mode === 'multiplayer' && invitedIds.length === 0 ? 'Invite Someone First' : 'Start Game'}
+                    {(isFeud || mode === 'multiplayer') && invitedIds.length === 0 ? 'Invite Someone First' : 'Start Game'}
                   </Text>
                 </>
               )}
             </TouchableOpacity>
 
             {/* GAME SUMMARY HINT */}
-            {canStart && !loading && (
+            {canStart && !isBusy && (
               <View className="mt-4 flex-row items-center justify-center">
                 <Ionicons name="information-circle-outline" size={12} color={colors.muted} />
                 <Text className="ml-1 text-[10px] text-muted font-semibold">
-                  10 questions · {DIFFICULTY_META[difficulty].label} · {mode === 'multiplayer' ? `${invitedIds.length + 1} players` : 'Solo play'}
+                  {isFeud
+                    ? `${feudRounds} rounds · ${DIFFICULTY_META[difficulty].label} · ${invitedIds.length + 1} players`
+                    : `10 questions · ${DIFFICULTY_META[difficulty].label} · ${mode === 'multiplayer' ? `${invitedIds.length + 1} players` : 'Solo play'}`}
                 </Text>
               </View>
             )}

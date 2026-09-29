@@ -1,5 +1,5 @@
 import { View, Text, Pressable } from 'react-native';
-import { useRouter } from 'expo-router';
+import { RelativePathString, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useColors } from '@/hooks/use-colors';
 import { useGameInviteStore } from '@/lib/stores/game-invite-store';
@@ -22,6 +22,8 @@ export function GameInviteTray() {
     >
       {invites.map((invite) => {
         const meta = GAME_META[invite.gameType];
+        const isFeud = invite.gameType === 'family_feud';
+        const route = `/(stack)/games/${isFeud ? 'feud/feud-lobby' : 'lobby'}?sessionId=${invite.sessionId}`
         return (
           <View
             key={invite.sessionId}
@@ -45,7 +47,7 @@ export function GameInviteTray() {
             <Pressable
               onPress={() => {
                 dismissInvite(invite.sessionId);
-                router.push(`/(stack)/games/lobby?sessionId=${invite.sessionId}`);
+                router.push(route as RelativePathString);
               }}
               style={{ backgroundColor: colors.primary }}
               className="rounded-full px-3.5 py-2"

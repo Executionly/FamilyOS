@@ -4,7 +4,7 @@ import { GAME_META } from '@/constants/games';
 
 export interface GameInvite {
   sessionId: string;
-  gameType: 'bible_trivia' | 'quiz';
+  gameType: 'bible_trivia' | 'quiz' | 'family_feud';
   hostName: string;
 }
 

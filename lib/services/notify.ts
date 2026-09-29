@@ -203,19 +203,19 @@ export async function notifyAssignment(payload: TargetedPayload) {
     });
 
     // Send family update to everyone else who has an account
-    const otherUserIds = allMemberUserIds.filter((uid) => uid !== assigneeUserId);
-    for (const userId of otherUserIds) {
-      await invokeSendPush({
-        family_id: payload.familyId,
-        user_id: userId,
-        type: 'family_update',
-        priority: 'informational',
-        title: payload.othersMessage.title,
-        body: payload.othersMessage.body,
-        action_label: payload.actionLabel,
-        action_route: payload.actionRoute,
-      });
-    }
+    // const otherUserIds = allMemberUserIds.filter((uid) => uid !== assigneeUserId);
+    // for (const userId of otherUserIds) {
+    //   await invokeSendPush({
+    //     family_id: payload.familyId,
+    //     user_id: userId,
+    //     type: 'family_update',
+    //     priority: 'informational',
+    //     title: payload.othersMessage.title,
+    //     body: payload.othersMessage.body,
+    //     action_label: payload.actionLabel,
+    //     action_route: payload.actionRoute,
+    //   });
+    // }
   } else {
     // Assignee has no account (child/managed profile)
     // Send the "others" message to all admins/coparents who do have accounts

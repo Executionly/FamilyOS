@@ -11,6 +11,12 @@ export const GAME_META = {
     icon: 'help-circle-outline' as const,
     color: '#F59E0B',
   },
+  family_feud: {
+    label: 'Family Feud',
+    description: 'Two teams, one board — guess the top answers before the strikes pile up.',
+    icon: 'people-circle' as const,
+    color: '#EF4444',
+  }
 };
 
 export const QUESTION_TIME_LIMIT_MS = 15000; // 15 seconds per question

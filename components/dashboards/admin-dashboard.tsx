@@ -4,7 +4,7 @@ import {
   FlatList, ActivityIndicator,
   RefreshControl,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { RelativePathString, useRouter } from 'expo-router';
 import Svg, { Circle, Text as SvgText } from 'react-native-svg';
 import { ScreenContainer } from '@/components/screen-container';
 import { useFamilyStore } from '@/lib/stores/family-store';
@@ -527,11 +527,15 @@ export default function AdminDashboard() {
               {/* ── Active game (only if one exists) ──────────── */}
               {activeGame && (
                 <Pressable
-                  onPress={() => router.push(
+                  onPress={() => {
+                    const isFeud = activeGame.game_type === 'family_feud';
+                    const waitingRoute = `/(stack)/games/${isFeud ? 'feud/feud-lobby' : 'lobby'}?sessionId=${activeGame.id}`
+                    const playRoute = `/(stack)/games/${isFeud ? 'feud/feud-play' : 'play'}?sessionId=${activeGame.id}`
+                    router.push(
                     activeGame.status === 'waiting'
-                      ? `/(stack)/games/lobby?sessionId=${activeGame.id}`
-                      : `/(stack)/games/play?sessionId=${activeGame.id}`
-                  )}
+                      ? waitingRoute as RelativePathString
+                      : playRoute as RelativePathString
+                  )}}
                   className="mb-4 flex-row items-center rounded-2xl border border-primary bg-primary/5 p-4"
                 >
                   <Ionicons name="game-controller" size={20} color={colors.primary} />
