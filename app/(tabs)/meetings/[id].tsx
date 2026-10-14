@@ -9,6 +9,7 @@ import { useMeetingStore } from '@/lib/stores/meeting-store';
 import { AppHeader } from '@/components/app-header';
 import { useFamilyStore } from '@/lib/stores/family-store';
 import { isAdminAccess } from '@/utils';
+import LinearButton from '@/components/ui/LinearButton';
 
 const CARD_SHADOW = {
   shadowColor: '#000',
@@ -308,52 +309,28 @@ export default function MeetingDetailScreen() {
       {/* Action Buttons */}
       <View style={{ borderTopColor: colors.border }} className="px-5 pt-3 pb-4 border-t flex-row items-center gap-3">
         {currentMeeting.status === 'scheduled' && isEditor && (
-          <Pressable onPress={() => router.push(`/meetings/run?meetingId=${currentMeeting.id}`)} className="flex-1">
-            {({ pressed }) => (
-              <View style={[CTA_SHADOW, { opacity: pressed ? 0.9 : 1, borderRadius: 16 }]} className="overflow-hidden">
-                <LinearGradient
-                  colors={[colors.primary, colors.primary + 'CC']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  
-                >
-                  <View className="py-3.5 items-center flex-row justify-center">
-                    <Ionicons name="play" size={16} color={colors.background} style={{ marginRight: 6 }} />
-                    <Text className="text-background font-bold text-sm">Start Meeting</Text>
-                  </View>
-                </LinearGradient>
-              </View>
-            )}
-          </Pressable>
+          <LinearButton
+            title='Start Meeting'
+            onPress={() => router.push(`/meetings/run?meetingId=${currentMeeting.id}`)}
+            icon='play'
+            />
         )}
 
         {currentMeeting.status === 'completed' && (
-          <Pressable onPress={() => router.push(`/meetings/summary?meetingId=${currentMeeting.id}`)} className="flex-1">
-            {({ pressed }) => (
-              <View style={[CTA_SHADOW, { opacity: pressed ? 0.9 : 1, borderRadius: 16 }]} className="overflow-hidden">
-                <LinearGradient
-                  colors={[colors.primary, colors.primary + 'CC']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  
-                >
-                  <View className="py-3.5 items-center flex-row justify-center">
-                    <Ionicons name="document-text-outline" size={16} color={colors.background} style={{ marginRight: 6 }} />
-                    <Text className="text-background font-bold text-sm">View Summary</Text>
-                  </View>
-                </LinearGradient>
-              </View>
-            )}
-          </Pressable>
+          <LinearButton
+            title='View Summary'
+            onPress={() => router.push(`/meetings/summary?meetingId=${currentMeeting.id}`)}
+            icon='document-text-outline'
+            />
         )}
 
         {isEditor && (
           <Pressable
             onPress={handleDelete}
-            style={({ pressed }) => [
-              { backgroundColor: '#FEE2E2', borderColor: '#FCA5A5', opacity: pressed ? 0.8 : 1 },
+            style={ [
+              { backgroundColor: '#FEE2E2' },
             ]}
-            className="flex-1 py-3.5 rounded-2xl items-center border flex-row justify-center"
+            className="flex-1 py-3.5 rounded-2xl items-center border border-red-700 flex-row justify-center"
           >
             <Ionicons name="trash-outline" size={15} color="#B91C1C" style={{ marginRight: 6 }} />
             <Text className="text-red-700 font-bold text-sm">Delete</Text>

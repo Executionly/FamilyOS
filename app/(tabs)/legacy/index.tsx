@@ -263,9 +263,9 @@ export default function LegacyScreen() {
                   <TouchableOpacity
                     onPress={handleAddStory}
                     style={[{ backgroundColor: colors.primary, }]}
-                    className="px-6 py-4 rounded-2xl flex-row items-center shadow-xs"
+                    className="px-6 py-4 rounded-2xl flex-row items-center shadow-xs flex-1"
                   >
-                    <Ionicons name="create-outline" size={16} color="#fff" style={{ marginRight: 6 }} />
+                    <Ionicons name="create-outline" size={16} color="#fff" style={{ marginRight: 4 }} />
                     <Text className="text-white text-xs font-bold">Write First Story</Text>
                   </TouchableOpacity>
                 </View>

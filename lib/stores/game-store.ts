@@ -12,7 +12,7 @@ export interface GameQuestion {
   explanation?: string;
 }
 
-type GameType = 'bible_trivia' | 'quiz' | 'family_feud';
+type GameType = 'bible_trivia' | 'quiz' | 'family_feud' | 'truth_dare';
  
 export interface StartOptions {
   difficulty?: 'easy' | 'medium' | 'hard';
@@ -131,66 +131,6 @@ export const useGameStore = create<GameState>((set, get) => ({
   dailyLimitReached: false,
   channel: null,
   charterRequired: false,
-
-  // startSession — multiplayer now creates in 'waiting' status, not 'in_progress'
-  // startSession: async (familyId, createdBy, memberId, gameType, mode, options) => {
-  //   set({ loading: true, error: null, dailyLimitReached: false });
-  //   try {
-  //     const { data, error } = await supabase.functions.invoke('generate-game-questions', {
-  //       body: { family_id: familyId, game_type: gameType, ...options },
-  //     });
-
-  //     if (error) {
-  //       const status = (error as any)?.context?.status;
-  //       if (status === 429) {
-  //         set({ dailyLimitReached: true, loading: false });
-  //         return null;
-  //       }
-  //       throw error;
-  //     }
-
-  //     const questionIds = data.question_ids;
-  //     const isMultiplayer = mode === 'multiplayer';
-
-  //     const { data: session, error: sessionError } = await supabase
-  //       .from('game_session')
-  //       .insert([{
-  //         family_id: familyId, game_type: gameType, mode,
-  //         question_ids: questionIds, created_by: createdBy,
-  //         status: isMultiplayer ? 'waiting' : 'in_progress',
-  //         question_started_at: isMultiplayer ? null : new Date().toISOString(),
-  //       }])
-  //       .select()
-  //       .single();
-  //     if (sessionError) throw sessionError;
-
-  //     const { data: participant, error: participantError } = await supabase
-  //       .from('game_participant')
-  //       .insert([{ session_id: session.id, member_id: memberId }])
-  //       .select()
-  //       .single();
-  //     if (participantError) throw participantError;
-
-  //     const { data: questions } = await supabase
-  //       .from('game_question')
-  //       .select('id, question, options, explanation')
-  //       .in('id', questionIds);
-
-  //     const orderedQuestions = questionIds.map((id: string) => questions?.find((q) => q.id === id)).filter(Boolean);
-
-  //     set({
-  //       currentSession: session,
-  //       questions: orderedQuestions,
-  //       participants: [{ ...participant, member: undefined }],
-  //       loading: false,
-  //     });
-
-  //     return session;
-  //   } catch (error) {
-  //     set({ error: error instanceof Error ? error.message : 'Failed to start game', loading: false });
-  //     return null;
-  //   }
-  // },
 
 
 startSession: async (familyId, createdBy, memberId, gameType, mode, options) => {
@@ -381,23 +321,23 @@ inviteAndStart: async (familyId, createdBy, memberId, gameType, invitedMemberIds
   },
 
   findActiveSession: async (familyId, memberId) => {
-  const { data: participantRows } = await supabase
-    .from('game_participant').select('session_id').eq('member_id', memberId);
-  const sessionIds = (participantRows ?? []).map((p) => p.session_id);
-  if (sessionIds.length === 0) return null;
+    const { data: participantRows } = await supabase
+      .from('game_participant').select('session_id').eq('member_id', memberId);
+    const sessionIds = (participantRows ?? []).map((p) => p.session_id);
+    if (sessionIds.length === 0) return null;
 
-  const { data } = await supabase
-    .from('game_session')
-    .select('*')
-    .in('id', sessionIds)
-    .eq('family_id', familyId)
-    .in('status', ['waiting', 'in_progress', 'paused'])
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    const { data } = await supabase
+      .from('game_session')
+      .select('*')
+      .in('id', sessionIds)
+      .eq('family_id', familyId)
+      .in('status', ['waiting', 'in_progress', 'paused'])
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
-  return data ?? null;
-},
+      return data ?? null;
+  },
 
 // inviteAndStart: async (familyId, createdBy, memberId, gameType, invitedMemberIds, options) => {
 //   set({ loading: true, error: null, dailyLimitReached: false });
@@ -478,6 +418,7 @@ pauseSession: async (sessionId: string) => {
 
 resumeSession: async (sessionId: string) => {
   const session = get().currentSession;
+
   if (!session?.paused_at || !session.question_started_at) return;
 
   const pausedMs = Date.now() - new Date(session.paused_at).getTime();

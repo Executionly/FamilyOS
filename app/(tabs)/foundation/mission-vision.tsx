@@ -10,6 +10,7 @@ import { generateMissionVision, LlmUpgradeRequiredError } from '@/lib/services/c
 import { useFamilyStore } from '@/lib/stores/family-store';
 import { AppHeader } from '@/components/app-header';
 import { UpgradePrompt } from '@/components/upgrade-prompt';
+import LinearButton from '@/components/ui/LinearButton';
 
 const SHADOW = {
   shadowColor: '#000',
@@ -304,23 +305,11 @@ export default function MissionVisionScreen() {
           </Pressable>
 
           {/* Continue Button */}
-          <Pressable onPress={handleContinue}>
-            {({ pressed }) => (
-              <View style={[SHADOW, { opacity: pressed ? 0.9 : 1, borderRadius: 18 }]} className="overflow-hidden">
-                <LinearGradient
-                  colors={[colors.primary, colors.primary + 'CC']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  
-                >
-                  <View className="py-4 items-center flex-row justify-center">
-                    <Text className="text-base font-bold text-background mr-2">Continue to Values</Text>
-                    <Ionicons name="arrow-forward" size={17} color={colors.background} />
-                  </View>
-                </LinearGradient>
-              </View>
-            )}
-          </Pressable>
+          <LinearButton
+            title='Continue to Values'
+            onPress={handleContinue}
+            icon='arrow-forward'
+            />
         </View>
       </ScrollView>
       <UpgradePrompt

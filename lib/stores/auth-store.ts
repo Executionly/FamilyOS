@@ -319,6 +319,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       set({ error: null });
       return data;
     } catch (error) {
+      console.log('Error updating profile:', error);
       const message = error instanceof Error ? error.message : 'Failed to update profile';
       set({ error: message });
       throw error;

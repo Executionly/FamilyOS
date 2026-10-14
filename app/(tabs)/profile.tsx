@@ -291,8 +291,7 @@ return (
         {!isPremium && !showExpiredCard && (
           <Pressable
             onPress={() => router.push('/(stack)/paywall')}
-            style={({ pressed }) => ({
-              opacity: pressed ? 0.86 : 1,
+            style={ ({
               shadowColor: '#D97706',
               shadowOffset: { width: 0, height: 6 },
               shadowOpacity: 0.22,
@@ -305,28 +304,30 @@ return (
               colors={['#F59E0B', '#D97706']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
-              className="flex-row items-center px-4 py-4"
+              
             >
-              <View className="h-10 w-10 items-center justify-center rounded-xl bg-white/20">
-                <Ionicons name="sparkles" size={20} color="#FFFFFF" />
-              </View>
+              <View className="flex-row items-center px-4 py-4">
+                <View className="h-10 w-10 items-center justify-center rounded-xl bg-white/20">
+                  <Ionicons name="sparkles" size={20} color="#FFFFFF" />
+                </View>
 
-              <View className="ml-3 flex-1">
-                <Text className="text-sm font-black text-white">
-                  Unlock Premium
-                </Text>
+                <View className="ml-3 flex-1">
+                  <Text className="text-sm font-black text-white">
+                    Unlock Premium
+                  </Text>
 
-                <Text className="mt-0.5 text-[11px] font-medium text-white/80">
-                  Full AI access, unlimited members & storage
-                </Text>
-              </View>
+                  <Text className="mt-0.5 text-[11px] font-medium text-white/80">
+                    Full AI access, unlimited members & storage
+                  </Text>
+                </View>
 
-              <View className="h-8 w-8 items-center justify-center rounded-full bg-white/15">
-                <Ionicons
-                  name="arrow-forward"
-                  size={16}
-                  color="#FFFFFF"
-                />
+                <View className="h-8 w-8 items-center justify-center rounded-full bg-white/15">
+                  <Ionicons
+                    name="arrow-forward"
+                    size={16}
+                    color="#FFFFFF"
+                  />
+                </View>
               </View>
             </LinearGradient>
           </Pressable>

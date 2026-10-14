@@ -1,6 +1,11 @@
 // Zero AI in any of this — per spec section 11 and 28, gameplay matching
 // and scoring must be fully deterministic.
 
+// Applies to face-off, play/pass, a turn answer, and a steal attempt —
+// one shared limit keeps the client's countdown and the server's timeout
+// enforcement trivially in sync.
+export const TURN_TIME_LIMIT_MS = 30000;
+
 export function normalizeAnswer(text: string): string {
   return text
     .toLowerCase()

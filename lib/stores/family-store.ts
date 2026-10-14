@@ -4,6 +4,7 @@ import { embedContent } from '../services/embed-content';
 import { notifyMember } from '../services/notify';
 import { checkStorageBeforeUpload, getFileSizeBytes, recordUpload, StorageLimitError } from '@/utils/storage-gate';
 import { ProductivityEnergy, TemperamentType } from '@/types';
+import { uploadPhoto } from '../services/upload';
 
 export class MemberLimitError extends Error {
   constructor() {
@@ -64,6 +65,7 @@ interface FamilyState {
   currentMember: Member | null;
   loading: boolean;
   error: string | null;
+  channel: ReturnType<typeof supabase.channel> | null;
 
   // Actions
   fetchFamily: (familyId: string) => Promise<void>;
@@ -87,7 +89,8 @@ interface FamilyState {
   upgradeRequired: boolean;
   upgradeReason: 'ai_feature' | 'quota_exceeded' | null;
   clearStorageLimitError: () => void;
-  
+  subscribeToFamilyRealtime: (familyId: string) => () => void;
+  unsubscribeFromFamilyRealtime: () => void;
 }
 
 export const useFamilyStore = create<FamilyState>((set, get) => ({
@@ -96,6 +99,7 @@ export const useFamilyStore = create<FamilyState>((set, get) => ({
   currentMember: null,
   loading: false,
   error: null,
+  channel: null,
 
   upgradeRequired: false,
   upgradeReason: null,
@@ -103,59 +107,59 @@ export const useFamilyStore = create<FamilyState>((set, get) => ({
 
   clearStorageLimitError: () => set({ storageLimitError: null }),
 
- fetchFamilyForUser: async (userId: string) => {
-    set({ loading: true });
-    try {
-      // Try the member path first (works for co-parents / non-admin members)
-      const { data: memberRows, error: memberError } = await supabase
-      .from('member')
-      .select('family_id, created_at')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false })
-      .limit(1);
-
-    if (memberError) throw memberError;
-
-    let familyId = memberRows?.[0]?.family_id ?? null;
-
-    if (!familyId) {
-      const { data: ownedFamilies, error: ownedError } = await supabase
-        .from('family')
-        .select('id, created_at')
-        .eq('created_by', userId)
+  fetchFamilyForUser: async (userId: string) => {
+      set({ loading: true });
+      try {
+        // Try the member path first (works for co-parents / non-admin members)
+        const { data: memberRows, error: memberError } = await supabase
+        .from('member')
+        .select('family_id, created_at')
+        .eq('user_id', userId)
         .order('created_at', { ascending: false })
         .limit(1);
 
-        
-      if (ownedError) throw ownedError;
+      if (memberError) throw memberError;
 
-      familyId = ownedFamilies?.[0]?.id ?? null;
-    }
+      let familyId = memberRows?.[0]?.family_id ?? null;
 
       if (!familyId) {
-        set({ family: null, members: [], error: null });
-        return;
+        const { data: ownedFamilies, error: ownedError } = await supabase
+          .from('family')
+          .select('id, created_at')
+          .eq('created_by', userId)
+          .order('created_at', { ascending: false })
+          .limit(1);
+
+          
+        if (ownedError) throw ownedError;
+
+        familyId = ownedFamilies?.[0]?.id ?? null;
       }
 
-      const [{ data: family, error: familyError }, { data: members, error: membersError }] =
-        await Promise.all([
-          supabase.from('family').select('*').eq('id', familyId).single(),
-          supabase.from('member').select('*').eq('family_id', familyId).order('created_at', { ascending: true }),
-        ]);
+        if (!familyId) {
+          set({ family: null, members: [], error: null });
+          return;
+        }
 
-      if (familyError) throw familyError;
-      if (membersError) throw membersError;
+        const [{ data: family, error: familyError }, { data: members, error: membersError }] =
+          await Promise.all([
+            supabase.from('family').select('*').eq('id', familyId).single(),
+            supabase.from('member').select('*').eq('family_id', familyId).order('created_at', { ascending: true }),
+          ]);
 
-      const { data: { user } } = await supabase.auth.getUser();
-      const currentMember = members?.find((m) => m.user_id === user?.id) ?? null;
+        if (familyError) throw familyError;
+        if (membersError) throw membersError;
 
-      set({ family, members: members || [],currentMember, error: null });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to fetch family for user';
-      set({ error: message });
-    } finally {
-      set({ loading: false });
-    }
+        const { data: { user } } = await supabase.auth.getUser();
+        const currentMember = members?.find((m) => m.user_id === user?.id) ?? null;
+
+        set({ family, members: members || [],currentMember, error: null });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Failed to fetch family for user';
+        set({ error: message });
+      } finally {
+        set({ loading: false });
+      }
   },
 
   fetchFamily: async (familyId: string) => {
@@ -356,17 +360,7 @@ export const useFamilyStore = create<FamilyState>((set, get) => ({
 
       const storagePath = `${memberId}/${Date.now()}_${fileName}`;
 
-      const formData = new FormData();
-      formData.append('file', {
-        uri: fileUri,
-        name: fileName,
-        type: mimeType,
-      } as any);
-
-      const { error: uploadError } = await supabase.storage
-        .from('member-avatars')
-        .upload(storagePath, formData, { contentType: mimeType, upsert: false });
-      if (uploadError) throw uploadError;
+      await uploadPhoto('member-avatars',storagePath,fileUri, mimeType)
 
       await recordUpload({
           familyId, bucket: 'member-avatars', storagePath, sizeBytes: fileSizeBytes,
@@ -422,13 +416,7 @@ export const useFamilyStore = create<FamilyState>((set, get) => ({
 
       const storagePath = `${familyId}/${Date.now()}_${fileName}`;
 
-      const formData = new FormData();
-      formData.append('file', { uri: fileUri, name: fileName, type: mimeType } as any);
-
-      const { error: uploadError } = await supabase.storage
-        .from('family-photos')
-        .upload(storagePath, formData, { contentType: mimeType, upsert: false });
-      if (uploadError) throw uploadError;
+      await uploadPhoto('family-photos',storagePath,fileUri, mimeType)
 
       await recordUpload({
           familyId, bucket: 'family-memories', storagePath, sizeBytes: fileSizeBytes,
@@ -555,5 +543,119 @@ export const useFamilyStore = create<FamilyState>((set, get) => ({
 
   setError: (error: string | null) => {
     set({ error });
+  },
+
+  subscribeToFamilyRealtime: (familyId: string) => {
+  const channel = supabase
+    .channel(`family-realtime:${familyId}`)
+
+    // FAMILY
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'family',
+        filter: `id=eq.${familyId}`,
+      },
+      (payload) => {
+        console.log('[Realtime] family:', payload.eventType, payload);
+
+        if (payload.eventType === 'UPDATE') {
+          set({
+            family: payload.new as Family,
+          });
+        }
+
+        if (payload.eventType === 'DELETE') {
+          set({
+            family: null,
+            members: [],
+            currentMember: null,
+          });
+        }
+      },
+    )
+
+    // MEMBERS
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'member',
+        filter: `family_id=eq.${familyId}`,
+      },
+      (payload) => {
+        console.log('[Realtime] member:', payload.eventType, payload);
+
+        if (payload.eventType === 'INSERT') {
+          const member = payload.new as Member;
+
+          set((state) => {
+            // Prevent duplicate if this device already inserted it locally
+            if (state.members.some((m) => m.id === member.id)) {
+              return state;
+            }
+
+            return {
+              members: [...state.members, member],
+            };
+          });
+        }
+
+        if (payload.eventType === 'UPDATE') {
+          const member = payload.new as Member;
+
+          set((state) => ({
+            members: state.members.map((m) =>
+              m.id === member.id ? member : m,
+            ),
+
+            currentMember:
+              state.currentMember?.id === member.id
+                ? member
+                : state.currentMember,
+          }));
+        }
+
+        if (payload.eventType === 'DELETE') {
+          const member = payload.old as Member;
+
+          set((state) => ({
+            members: state.members.filter(
+              (m) => m.id !== member.id,
+            ),
+
+            currentMember:
+              state.currentMember?.id === member.id
+                ? null
+                : state.currentMember,
+          }));
+        }
+      },
+    )
+
+    .subscribe((status) => {
+      console.log(
+        `[Realtime] family ${familyId}:`,
+        status,
+      );
+    });
+
+    set({ channel });
+
+  return () => {
+    console.log(
+      `[Realtime] unsubscribing family ${familyId}`,
+    );
+
+    supabase.removeChannel(channel);
+  };
+},
+  unsubscribeFromFamilyRealtime: () => {
+    const { channel } = get();
+    if (channel) supabase.removeChannel(channel);
+    set({ channel: null });
   },
 }));

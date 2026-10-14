@@ -16,7 +16,13 @@ export const GAME_META = {
     description: 'Two teams, one board — guess the top answers before the strikes pile up.',
     icon: 'people-circle' as const,
     color: '#EF4444',
-  }
+  },
+  truth_dare: {
+    label: 'Truth or Dare',
+    description: 'Take turns picking truth or dare. Best with everyone in the same room.',
+    icon: 'flame' as const,
+    color: '#EC4899',
+  },
 };
 
 export const QUESTION_TIME_LIMIT_MS = 15000; // 15 seconds per question

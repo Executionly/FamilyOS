@@ -539,7 +539,6 @@ export default function MemberProfileScreen() {
       ],
     );
   };
-
   return (
     <ScreenContainer
       containerClassName="bg-background"
@@ -729,7 +728,7 @@ export default function MemberProfileScreen() {
                 backgroundColor: `${colors.primary}08`,
                 borderBottomColor: `${colors.primary}15`,
               }}
-              className="flex-row items-center border-b px-5 py-4"
+              className="flex-row flex-1 items-center border-b px-5 py-4"
             >
               <View
                 style={{ backgroundColor: `${colors.primary}15` }}

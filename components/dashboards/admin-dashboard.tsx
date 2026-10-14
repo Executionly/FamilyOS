@@ -442,6 +442,31 @@ export default function AdminDashboard() {
                 </CoachmarkTarget>
               )}
 
+              {/* ── Active game (only if one exists) ──────────── */}
+              {activeGame && (
+                <Pressable
+                  onPress={() => {
+                    const isFeud = activeGame.game_type === 'family_feud';
+                    const waitingRoute = `/(stack)/games/${isFeud ? 'feud/feud-lobby' : 'lobby'}?sessionId=${activeGame.id}`
+                    const playRoute = `/(stack)/games/${isFeud ? 'feud/feud-play' : 'play'}?sessionId=${activeGame.id}`
+                    router.push(
+                    activeGame.status === 'waiting'
+                      ? waitingRoute as RelativePathString
+                      : playRoute as RelativePathString
+                  )}}
+                  className="mb-4 flex-row items-center rounded-2xl border border-primary bg-primary/5 p-4"
+                >
+                  <Ionicons name="game-controller" size={20} color={colors.primary} />
+                  <View className="ml-3 flex-1">
+                    <Text className="text-sm font-bold text-foreground">
+                      {activeGame.status === 'waiting' ? 'Game waiting for you' : 'Game in progress'}
+                    </Text>
+                    <Text className="text-xs text-muted">{GAME_META[activeGame.game_type].label}</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={16} color={colors.primary} />
+                </Pressable>
+              )}
+
               {/* ── Family Snapshot (progress + counts, one card) ── */}
               <CoachmarkTarget id="snapshot" order={3} title="Family Snapshot" description="A quick read on commitments, chores, and meetings — how your family is trending.">
                 <View style={{
@@ -524,30 +549,7 @@ export default function AdminDashboard() {
                 </View>
               )}
 
-              {/* ── Active game (only if one exists) ──────────── */}
-              {activeGame && (
-                <Pressable
-                  onPress={() => {
-                    const isFeud = activeGame.game_type === 'family_feud';
-                    const waitingRoute = `/(stack)/games/${isFeud ? 'feud/feud-lobby' : 'lobby'}?sessionId=${activeGame.id}`
-                    const playRoute = `/(stack)/games/${isFeud ? 'feud/feud-play' : 'play'}?sessionId=${activeGame.id}`
-                    router.push(
-                    activeGame.status === 'waiting'
-                      ? waitingRoute as RelativePathString
-                      : playRoute as RelativePathString
-                  )}}
-                  className="mb-4 flex-row items-center rounded-2xl border border-primary bg-primary/5 p-4"
-                >
-                  <Ionicons name="game-controller" size={20} color={colors.primary} />
-                  <View className="ml-3 flex-1">
-                    <Text className="text-sm font-bold text-foreground">
-                      {activeGame.status === 'waiting' ? 'Game waiting for you' : 'Game in progress'}
-                    </Text>
-                    <Text className="text-xs text-muted">{GAME_META[activeGame.game_type].label}</Text>
-                  </View>
-                  <Ionicons name="chevron-forward" size={16} color={colors.primary} />
-                </Pressable>
-              )}
+              
               {/* ── Family Challenge ──────────────────────────── */}
               <CoachmarkTarget id="challenge" order={4} title="Family Challenges" description="A fun, values-based challenge for your family to take on together.">
                 <FamilyChallengeCard />

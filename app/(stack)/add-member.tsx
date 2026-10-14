@@ -47,7 +47,13 @@ export default function AddMemberScreen() {
     }
 
     try {
-      await addMember(family.id, { name: name.trim(), role, age_band: ageBand });
+      await addMember(family.id, { 
+        name: name.trim(), 
+        role, 
+        age_band: ageBand,
+        assessment_completed: false,
+        sharing_preference: 'family'
+      });
       router.back();
     } catch(err) {
       if (err instanceof MemberLimitError) {

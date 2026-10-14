@@ -345,28 +345,11 @@ export default function FoundationBuilderScreen() {
 
               {/* Action Buttons */}
               <View className="gap-3">
-                <Pressable onPress={handleViewCharter}>
-                  {({ pressed }) => (
-                    <View style={[SHADOW, { opacity: pressed ? 0.9 : 1, borderRadius: 18 }]} className="overflow-hidden">
-                      <LinearGradient
-                        colors={[colors.primary, colors.primary + 'CC']}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 0 }}
-                        className=""
-                      >
-                        <View className='py-4 items-center flex-row justify-center'>
-                          <Ionicons
-                            name="book-outline"
-                            size={18}
-                            color={colors.background}
-                            style={{ marginRight: 8 }}
-                          />
-                          <Text className="text-base font-bold text-background">View Full Charter</Text>
-                        </View>
-                      </LinearGradient>
-                    </View>
-                  )}
-                </Pressable>
+                <LinearButton
+                  title='View Full Charter'
+                  onPress={handleViewCharter}
+                  icon='book-outline'
+                  />
 
                 {isEditor && (
                   <Pressable

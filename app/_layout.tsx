@@ -3,8 +3,6 @@ import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { ThemeProvider } from '@/lib/theme-provider';
-import { useAuthStore } from '@/lib/stores/auth-store';
-import { useOnboardingStore } from '@/lib/stores/onboarding-store';
 import '@/global.css';
 import { usePushNotifications } from '@/hooks/use-push-notification';
 import { useFonts, SpaceGrotesk_700Bold, SpaceGrotesk_500Medium } from '@expo-google-fonts/space-grotesk';
@@ -14,6 +12,7 @@ import { BriefingModal } from '@/components/briefing-modal';
 import { StatusBar } from 'expo-status-bar';
 import {SafeAreaProvider} from 'react-native-safe-area-context'
 import { GameInviteTray } from '@/components/modals/GameInviteTray';
+import AppUpdateBanner from '@/components/AppUpdateBanner';
 
 
 SplashScreen.preventAutoHideAsync();
@@ -44,6 +43,7 @@ export default function RootLayout() {
               <ToastHost />
               <BriefingModal />
               <GameInviteTray />
+              <AppUpdateBanner />
                 <Stack
                   screenOptions={{
                     headerShown: false,

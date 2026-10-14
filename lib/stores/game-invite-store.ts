@@ -1,10 +1,9 @@
 import { create } from 'zustand';
 import { supabase } from '@/lib/_core/supabase';
-import { GAME_META } from '@/constants/games';
 
 export interface GameInvite {
   sessionId: string;
-  gameType: 'bible_trivia' | 'quiz' | 'family_feud';
+  gameType: 'bible_trivia' | 'quiz' | 'family_feud' | 'truth_dare';
   hostName: string;
 }
 
@@ -30,6 +29,7 @@ export const useGameInviteStore = create<GameInviteState>((set, get) => ({
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'game_session', filter: `family_id=eq.${familyId}` },
         async (payload) => {
           const session = payload.new as any;
+          console.log("SESSION INSERT", session)
           if (session.mode !== 'multiplayer') return;
           if (!session.invited_member_ids?.includes(myMemberId)) return; // only actual invitees
 

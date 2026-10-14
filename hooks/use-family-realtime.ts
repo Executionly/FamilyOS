@@ -20,10 +20,12 @@ export function useFamilyRealtime(familyId: string | undefined, userId: string |
   const { subscribeToToasts: subGroupChatToasts, unsubscribeFromToasts: unsubGroupChatToasts } = useGroupChatStore();
   const { subscribeToToasts: subDmToasts, unsubscribeFromToasts: unsubDmToasts } = useDmStore();
   const { subscribe: subGameInvites, unsubscribe: unsubGameInvites } = useGameInviteStore();
+  const {subscribeToFamilyRealtime: subFamily, unsubscribeFromFamilyRealtime} = useFamilyStore()
 
   useEffect(() => {
     if (!familyId || !userId) return;
 
+    subFamily(familyId)
     subChores(familyId);
     subCommitments(familyId);
     subEvents(familyId);
@@ -35,6 +37,7 @@ export function useFamilyRealtime(familyId: string | undefined, userId: string |
 
 
     return () => {
+      unsubscribeFromFamilyRealtime()
       unsubChores();
       unsubCommitments();
       unsubEvents();

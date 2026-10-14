@@ -1,12 +1,16 @@
 import { useEffect, useState } from 'react';
-import { View, Text, Pressable, ScrollView, ActivityIndicator, TextInput } from 'react-native';
+import { View, Text, Pressable, ScrollView, ActivityIndicator, TextInput, TouchableOpacity } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { ScreenContainer } from '@/components/screen-container';
 import { useColors } from '@/hooks/use-colors';
 import { useFamilyStore } from '@/lib/stores/family-store';
-import type { TeamId } from '../../../../types';
+import { useGameStore } from '@/lib/stores/game-store';
+import type { TeamId } from '@/types';
 import { useFeudStore } from '@/lib/stores/useFeudStore';
+
+const TIMED_PHASES = new Set(['face_off', 'play_or_pass', 'playing', 'steal']);
+const TURN_TIME_LIMIT_MS = 30000;
 
 const TEAM_META: Record<TeamId, { label: string; color: string }> = {
   A: { label: 'Team A', color: '#3B82F6' },
@@ -31,12 +35,17 @@ export default function FeudPlayScreen() {
     choosePlayOrPass,
     submitTurnAnswer,
     submitStealAnswer,
+    submitTimeout,
     startNextRound,
+    pauseSession, 
+    resumeSession 
   } = useFeudStore();
 
   const [answerText, setAnswerText] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
   const myMemberId = currentMember?.id;
+  const isPaused = currentSession?.status === 'paused';
 
   useEffect(() => {
     if (!sessionId || !myMemberId) return;
@@ -52,6 +61,33 @@ export default function FeudPlayScreen() {
   useEffect(() => {
     setAnswerText('');
   }, [currentSession?.feud_phase, currentSession?.current_player_id]);
+
+  // Countdown — every participant's client runs this independently, so a
+  // stalling player can't just sit on their own turn: anyone's client will
+  // report the timeout once it genuinely elapses (the server re-checks the
+  // elapsed time itself before honouring it, so this can't be gamed early).
+  useEffect(() => {
+    if (!currentSession || isPaused || !TIMED_PHASES.has(currentSession.feud_phase ?? '')) {
+      setSecondsLeft(null);
+      return;
+    }
+    if (!currentSession.question_started_at) return;
+
+    let reported = false;
+    const tick = () => {
+      const elapsed = Date.now() - new Date(currentSession.question_started_at!).getTime();
+      const remaining = Math.max(0, Math.ceil((TURN_TIME_LIMIT_MS - elapsed) / 1000));
+      setSecondsLeft(remaining);
+      if (remaining === 0 && !reported && sessionId && myMemberId) {
+        reported = true;
+        submitTimeout(sessionId, myMemberId);
+      }
+    };
+
+    tick();
+    const interval = setInterval(tick, 1000);
+    return () => clearInterval(interval);
+  }, [currentSession?.question_started_at, currentSession?.feud_phase, isPaused, sessionId, myMemberId]);
 
   const nameFor = (memberId?: string | null) => participants.find((p) => p.member_id === memberId)?.member?.name ?? 'Player';
   const teamFor = (memberId?: string | null) => participants.find((p) => p.member_id === memberId)?.team_id ?? null;
@@ -180,6 +216,38 @@ export default function FeudPlayScreen() {
     setSubmitting(false);
   };
 
+  if (isPaused) {
+    return (
+      <ScreenContainer containerClassName="bg-background" safeAreaClassName="bg-background">
+        <View className="flex-1 items-center justify-center px-6">
+          <View
+            style={{ backgroundColor: colors.surface, borderColor: colors.border }}
+            className="w-full items-center rounded-[28px] border p-8"
+          >
+            <View
+              style={{ backgroundColor: `${colors.primary}18`, borderColor: `${colors.primary}35` }}
+              className="mb-5 h-20 w-20 items-center justify-center rounded-full border"
+            >
+              <Ionicons name="pause" size={36} color={colors.primary} />
+            </View>
+            <Text className="text-center text-2xl font-black text-foreground">Game paused</Text>
+            <Text className="mt-2 text-center text-sm font-medium text-muted">
+              The timer is on hold too — resume whenever you're ready.
+            </Text>
+            <TouchableOpacity
+              onPress={() => sessionId && resumeSession(sessionId)}
+              style={{ backgroundColor: colors.primary }}
+              className="mt-6 w-full flex-row items-center justify-center rounded-2xl py-4"
+            >
+              <Ionicons name="play" size={18} color="#fff" />
+              <Text className="ml-2 text-sm font-black text-white">Resume game</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </ScreenContainer>
+    );
+  }
+
   return (
     <ScreenContainer containerClassName="bg-background" safeAreaClassName="bg-background">
       <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
@@ -187,13 +255,54 @@ export default function FeudPlayScreen() {
           <Text className="text-[10px] font-bold uppercase tracking-widest text-muted">
             Round {currentSession.feud_round} of {currentSession.feud_total_rounds}
           </Text>
-          {phase === 'playing' && (
-            <Text className="text-[10px] font-bold uppercase tracking-widest text-error">
-              {'X '.repeat(currentSession.strikes).trim() || 'No strikes'}
-            </Text>
-          )}
+          <View className="flex-row items-center gap-3">
+            {secondsLeft !== null && (
+              <View
+                style={{
+                  backgroundColor: secondsLeft <= 5 ? '#EF444415' : `${colors.primary}15`,
+                  borderColor: secondsLeft <= 5 ? '#EF444440' : `${colors.primary}40`,
+                }}
+                className="flex-row items-center rounded-full border px-2.5 py-1"
+              >
+                <Ionicons name="time" size={12} color={secondsLeft <= 5 ? '#EF4444' : colors.primary} />
+                <Text
+                  style={{ color: secondsLeft <= 5 ? '#EF4444' : colors.primary }}
+                  className="ml-1 text-[11px] font-black"
+                >
+                  {secondsLeft}s
+                </Text>
+              </View>
+            )}
+            {(phase === 'playing' || phase === 'steal') && (
+              <Text className="text-[10px] font-bold uppercase tracking-widest text-error">
+                {'X '.repeat(currentSession.strikes).trim() || 'No strikes'}
+              </Text>
+            )}
+            <Pressable
+              onPress={() => sessionId && pauseSession(sessionId)}
+              style={{ backgroundColor: colors.surface, borderColor: colors.border }}
+              className="h-7 w-7 items-center justify-center rounded-lg border"
+            >
+              <Ionicons name="pause" size={13} color={colors.foreground} />
+            </Pressable>
+          </View>
         </View>
 
+        {(phase === 'playing' || phase === 'steal') && (
+          <View
+            style={{ backgroundColor: `${colors.primary}10`, borderColor: `${colors.primary}30` }}
+            className="mb-4 flex-row items-center justify-between rounded-xl border px-4 py-3"
+          >
+            <Text className="text-xs font-bold text-foreground">
+              This round so far ({TEAM_META[currentSession.controlling_team_id!].label} on the board)
+            </Text>
+            <Text style={{ color: colors.primary }} className="text-lg font-black">
+              {currentSession.round_points}
+            </Text>
+          </View>
+        )}
+
+        <Text className="mb-1 text-[9px] font-bold uppercase tracking-widest text-muted">Banked score</Text>
         {renderScoreBar()}
 
         <View

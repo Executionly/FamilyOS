@@ -393,16 +393,16 @@ export default function FamilyDynamicsScreen() {
               style={{
                 borderTopColor: colors.border,
                 backgroundColor: `${colors.primary}06`,
+                marginBottom: 5
               }}
               className="border-t px-5 py-4"
             >
               <Pressable
                 onPress={() => router.push('/(stack)/paywall')}
-                style={({ pressed }) => ({
+                style={({
                   backgroundColor: colors.primary,
-                  opacity: pressed ? 0.82 : 1,
                 })}
-                className="flex-row items-center justify-center rounded-xl py-3"
+                className="flex-row items-center bg-primary-light justify-center rounded-xl py-3"
               >
                 <Text className="text-sm font-black text-white">Upgrade</Text>
 
@@ -573,9 +573,6 @@ export default function FamilyDynamicsScreen() {
 
             <Pressable
               onPress={handleGenerate}
-              style={({ pressed }) => ({
-                opacity: pressed ? 0.6 : 1,
-              })}
               className="mt-1 flex-row items-center self-start px-1 py-2"
             >
               <Ionicons

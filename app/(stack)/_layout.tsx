@@ -33,6 +33,7 @@ export default function StackLayout() {
       <Stack.Screen name="member-profile" />
       <Stack.Screen name="guide" />
       <Stack.Screen name="challenge-cadence" />
+      <Stack.Screen name="games" />
     </Stack>
   );
 }

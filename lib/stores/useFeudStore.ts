@@ -1,7 +1,7 @@
 import { create } from 'zustand';
-import { supabase } from '@/lib/_core/supabase'; 
+import { supabase } from '@/lib/_core/supabase';
 import { notifyAssignment } from '../services/notify'; 
-import type { FeudAnswer, FeudParticipant, FeudQuestion, FeudSession } from '../../types';
+import type { FeudAnswer, FeudParticipant, FeudQuestion, FeudSession } from '@/types';
 
 interface CreateOptions {
   totalRounds?: number;
@@ -33,12 +33,16 @@ interface FeudState {
   shuffleTeams: (sessionId: string, memberId: string) => Promise<void>;
   startGame: (sessionId: string, memberId: string) => Promise<void>;
   cancelSession: (sessionId: string) => Promise<void>;
+  pauseSession: (sessionId: string) => Promise<void>;
+  resumeSession: (sessionId: string) => Promise<void>;
+
 
   // ── Gameplay (thin wrappers around family-feud-action) ─────
   submitFaceOffAnswer: (sessionId: string, memberId: string, answerText: string) => Promise<void>;
   choosePlayOrPass: (sessionId: string, memberId: string, choice: 'play' | 'pass') => Promise<void>;
   submitTurnAnswer: (sessionId: string, memberId: string, answerText: string) => Promise<void>;
   submitStealAnswer: (sessionId: string, memberId: string, answerText: string) => Promise<void>;
+  submitTimeout: (sessionId: string, memberId: string) => Promise<void>;
   startNextRound: (sessionId: string, memberId: string) => Promise<void>;
 
   // ── Realtime ─────────────────────────────────────────────────
@@ -130,7 +134,7 @@ export const useFeudStore = create<FeudState>((set, get) => ({
           assigneeMessage: { title: "You've been invited to play", body: "You've been invited to play Family Feud." },
           othersMessage: { title: 'Game invitation sent', body: 'A family member has been invited to play Family Feud.' },
           actionLabel: 'Go to lobby',
-          actionRoute: `/(stack)/games/feud/feud-lobby?sessionId=${session.id}`,
+          actionRoute: `/(stack)/games/feud/lobby?sessionId=${session.id}`,
         });
       }
 
@@ -207,6 +211,46 @@ export const useFeudStore = create<FeudState>((set, get) => ({
     await supabase.from('game_session').update({ status: 'cancelled' }).eq('id', sessionId);
   },
 
+  pauseSession: async (sessionId) => {
+    try {
+      const { data, error } = await supabase
+        .from('game_session')
+        .update({ status: 'paused', paused_at: new Date().toISOString() })
+        .eq('id', sessionId)
+        .select()
+        .single();
+      if (error) throw error;
+      set({ currentSession: data as FeudSession, error: null });
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : 'Failed to pause game' });
+    }
+  },
+ 
+  resumeSession: async (sessionId) => {
+    try {
+      const session = get().currentSession; // this store's own state, kept live by the realtime subscription
+      let updates: Record<string, any>;
+ 
+      if (session?.paused_at && session.question_started_at) {
+        // Shift the timer forward by however long the pause lasted, so the
+        // remaining time is preserved rather than reset.
+        const pausedMs = Date.now() - new Date(session.paused_at).getTime();
+        const newStart = new Date(new Date(session.question_started_at).getTime() + pausedMs).toISOString();
+        updates = { status: 'in_progress', question_started_at: newStart, paused_at: null };
+      } else {
+        // Missing paused_at/question_started_at for some reason — don't
+        // silently do nothing, just unpause with a fresh timer.
+        updates = { status: 'in_progress', question_started_at: new Date().toISOString(), paused_at: null };
+      }
+ 
+      const { data, error } = await supabase.from('game_session').update(updates).eq('id', sessionId).select().single();
+      if (error) throw error;
+      set({ currentSession: data as FeudSession, error: null });
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : 'Failed to resume game' });
+    }
+  },
+
   submitFaceOffAnswer: async (sessionId, memberId, answerText) => {
     try {
       const session = await callAction(sessionId, memberId, 'submit_face_off_answer', { answer_text: answerText });
@@ -240,6 +284,19 @@ export const useFeudStore = create<FeudState>((set, get) => ({
       set({ currentSession: session, error: null });
     } catch (error) {
       set({ error: error instanceof Error ? error.message : 'Failed to submit steal' });
+    }
+  },
+
+  submitTimeout: async (sessionId, memberId) => {
+    try {
+      const session = await callAction(sessionId, memberId, 'submit_timeout');
+      set({ currentSession: session, error: null });
+    } catch (error) {
+      // Not surfaced as a user-facing error: it's normal for more than one
+      // client to fire this at once, or for the phase to have already
+      // moved on by the time this lands (e.g. someone answered in the
+      // last second). Only a genuinely stuck game would need a retry, and
+      // the next client-side tick handles that on its own.
     }
   },
 

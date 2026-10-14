@@ -194,7 +194,7 @@ export default function AccountSettingsScreen() {
       }
 
       try {
-        const { data: profileData } = await supabase
+        const { data: profileData, error } = await supabase
           .from('profiles')
           .select('full_name, country, ethnicity')
           .eq('id', userId)
@@ -408,7 +408,6 @@ export default function AccountSettingsScreen() {
             paddingHorizontal: 16,
             paddingTop: 14,
             paddingBottom: 4,
-            flex: 1
           }}
         >
           {/* Page introduction */}
@@ -749,6 +748,25 @@ export default function AccountSettingsScreen() {
               and is handled according to your account settings.
             </Text>
           </View>
+          {successMessage && (
+            <View
+              style={{
+                backgroundColor: '#10B9810D',
+                borderColor: '#10B98135',
+              }}
+              className="mb-4 flex-row items-center rounded-2xl border px-4 py-3.5"
+            >
+              <Ionicons
+                name="checkmark-circle"
+                size={18}
+                color="#10B981"
+              />
+
+              <Text className="ml-3 flex-1 text-sm font-semibold text-emerald-600">
+                {successMessage}
+              </Text>
+            </View>
+          )}
         </ScrollView>
       </KeyboardAvoidingView>
 
@@ -763,9 +781,9 @@ export default function AccountSettingsScreen() {
         <Pressable
           onPress={handleSaveProfile}
           disabled={loading}
-          style={({ pressed }) => ({
+          style={({
             backgroundColor: colors.primary,
-            opacity: loading ? 0.6 : pressed ? 0.82 : 1,
+            opacity: loading ? 0.6 : 1,
             shadowColor: colors.primary,
             shadowOffset: { width: 0, height: 6 },
             shadowOpacity: 0.22,

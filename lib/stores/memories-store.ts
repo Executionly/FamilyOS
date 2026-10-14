@@ -3,6 +3,43 @@ import { supabase } from '@/lib/_core/supabase';
 import { notifyAssignment, notifyFamily } from '../services/notify';
 import { embedContent } from '../services/embed-content';
 import { checkStorageBeforeUpload, checkVideoQuota, getFileSizeBytes, recordUpload, StorageLimitError, VideoLimitError } from '@/utils/storage-gate';
+import { File } from 'expo-file-system';
+import * as tus from 'tus-js-client';
+import { uploadPhoto } from '../services/upload';
+
+const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL!;
+const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!;
+
+
+async function uploadVideo(storagePath: string, fileUri: string, mimeType: string) {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.access_token) throw new Error('Not authenticated');
+
+  const blob = await (await fetch(fileUri)).blob();
+
+  await new Promise<void>((resolve, reject) => {
+    const upload = new tus.Upload(blob, {
+      endpoint: `${SUPABASE_URL}/storage/v1/upload/resumable`,
+      retryDelays: [0, 1000, 3000, 5000],
+      headers: {
+        authorization: `Bearer ${session.access_token}`,
+        apikey: SUPABASE_ANON_KEY,
+        'x-upsert': 'false',
+      },
+      uploadDataDuringCreation: true,
+      metadata: {
+        bucketName: 'family-memories',
+        objectName: storagePath,
+        contentType: mimeType,
+        cacheControl: '3600',
+      },
+      chunkSize: 6 * 1024 * 1024, // Supabase's TUS endpoint caps chunks at 6MB
+      onError: reject,
+      onSuccess: () => resolve(),
+    });
+    upload.start();
+  });
+}
 
 
 export interface Memory {
@@ -205,27 +242,17 @@ export const useMemoriesStore = create<MemoriesState>((set) => ({
       await checkStorageBeforeUpload(familyId, fileSizeBytes);
 
       if (mediaType === 'video') {
-        console.log("VID")
         await checkVideoQuota(familyId); // separate check, video-specific
       }
 
       const storagePath = `${familyId}/${Date.now()}_${fileName}`;
 
-      const formData = new FormData();
-      formData.append('file', {
-        uri: fileUri,
-        name: fileName,
-        type: mimeType,
-      } as any);
+      if (mediaType === 'video') {
+        await uploadVideo(storagePath, fileUri, mimeType);
+      } else {
+        await uploadPhoto('family-memories',storagePath, fileUri, mimeType);
+      }
 
-      const { error } = await supabase.storage
-        .from('family-memories')
-        .upload(storagePath, formData, {
-          contentType: mimeType,
-          upsert: false,
-        });
-
-      if (error) throw error;
       await recordUpload({
         familyId, bucket: 'family-memories', storagePath, sizeBytes: fileSizeBytes,
         sourceType: 'memory', createdBy: userId,
@@ -233,6 +260,7 @@ export const useMemoriesStore = create<MemoriesState>((set) => ({
 
       return storagePath;
     } catch (error) {
+      console.log("Upload error:", error);
       if (error instanceof StorageLimitError || error instanceof VideoLimitError) {
         set({ uploading: false });
         throw error;

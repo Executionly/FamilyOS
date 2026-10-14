@@ -66,7 +66,7 @@ export function AppHeader({ title, subtitle, showBack = false, onBack, right }: 
         <View style={{ flex: 1 }} />
       )}
 
-      <View style={{ minWidth: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 10 }}>
+      <View style={{ minWidth: 50, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 10 }}>
         {right}
       </View>
     </View>

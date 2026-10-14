@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { View, Text, Pressable, ScrollView, ActivityIndicator, Image, TouchableOpacity } from 'react-native';
+import { View, Text, Pressable, ScrollView, ActivityIndicator, Image, TouchableOpacity, Alert } from 'react-native';
 import { RelativePathString, useRouter, useSegments } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { ScreenContainer } from '@/components/screen-container';
@@ -11,6 +11,12 @@ import { GameSession, useGameStore } from '@/lib/stores/game-store';
 import { GAME_META } from '@/constants/games';
 import { MemberAvatar } from '@/components/ui/member-avatar';
 import { useFeudStore } from '@/lib/stores/useFeudStore';
+import { useTruthDareStore } from '@/lib/stores/useTruthDareStore';
+import { TdIntensity } from '@/types';
+import { isAdminAccess } from '@/utils';
+import { LlmUpgradeRequiredError } from '@/lib/_core/llm';
+import { UpgradePrompt } from '@/components/upgrade-prompt';
+import { useToastStore } from '@/lib/stores/toast-store';
 
 const DIFFICULTY_META = {
   easy: { label: 'Easy', color: '#10B981', icon: 'leaf-outline', desc: 'Casual play' },
@@ -20,7 +26,14 @@ const DIFFICULTY_META = {
 
 const ROUNDS_OPTIONS = [3, 5, 7] as const;
 
-type GameKey = 'bible_trivia' | 'quiz' | 'family_feud';
+type GameKey = 'bible_trivia' | 'quiz' | 'family_feud' | 'truth_dare';
+
+const TURN_OPTIONS: { label: string; value: number | null }[] = [
+  { label: 'Open', value: null },
+  { label: '10', value: 10 },
+  { label: '20', value: 20 },
+  { label: '30', value: 30 },
+];
 
 export default function GamesHubScreen() {
   const router = useRouter();
@@ -30,6 +43,7 @@ export default function GamesHubScreen() {
   const { user } = useAuthStore();
   const { startSession, loading, dailyLimitReached, charterRequired, findActiveSession, inviteAndStart } = useGameStore();
   const { createSession: createFeudSession, loading: feudLoading, error: feudError } = useFeudStore();
+  const { createSession: createTdSession, generateAiPrompts, loading: tdLoading, error: tdError } = useTruthDareStore();
 
   const [selectedGame, setSelectedGame] = useState<GameKey | null>(null);
   const [mode, setMode] = useState<'solo' | 'multiplayer'>('solo');
@@ -38,9 +52,16 @@ export default function GamesHubScreen() {
   const [invitedIds, setInvitedIds] = useState<string[]>([]);
   const [activeSession, setActiveSession] = useState<GameSession | null>(null);
   const [useFamilyData, setUseFamilyData] = useState(false)
+  const [maxTurns, setMaxTurns] = useState<number | null>(null);
+  const [intensity, setIntensity] = useState<TdIntensity>('mild');
+  const [generating, setGenerating] = useState(false);
+  const [upgradePromptVisible, setUpgradePromptVisible] = useState(false);
   const isPremium = family?.subscription_tier === 'premium';
   const isFeud = selectedGame === 'family_feud';
+  const isTd = selectedGame === 'truth_dare'
   const familyMode = selectedGame === 'quiz' && useFamilyData;
+  const canGenerate = family?.subscription_tier === 'premium';
+  const { showToast } = useToastStore();
 
   useEffect(() => {
     if (family?.id && currentMember?.id) {
@@ -63,9 +84,20 @@ export default function GamesHubScreen() {
       if (session) router.push(`/(stack)/games/feud/feud-lobby?sessionId=${session.id}`);
       return;
     }
+    if (isTd) {
+      if (invitedIds.length === 0) return;
+      const session = await createTdSession(
+        family.id, 
+        user.id, 
+        currentMember.id, 
+        invitedIds,
+        maxTurns,
+        intensity
+      );
+      if (session) router.push(`/(stack)/games/truth-dare/truth-dare-lobby?sessionId=${session.id}`);
+      return;
+    }
 
-    // familySpecific is computed from selectedGame, so toggling "Know Our Family" on and then
-    // switching to Bible Trivia can't leak the flag into the wrong game.
     const options = { difficulty, count: 10, familySpecific: familyMode };
 
     if (mode === 'multiplayer') {
@@ -77,10 +109,37 @@ export default function GamesHubScreen() {
     }
   };
 
+  const onGenerate = async () => {
+    if (!family) return;
+    try {
+      setGenerating(true);
+      const res = await generateAiPrompts(family.id, { intensity, count: 10 });
+      setGenerating(false);
+      showToast({
+        title: 'Prompts added',
+        body: `${res.added ?? 0} new prompts were added to your family's bank.`,
+        variant: 'success',
+      })
+      
+    } catch (err: any) {
+      if (err instanceof LlmUpgradeRequiredError) {
+        setUpgradePromptVisible(true);
+        return;
+      }
+      showToast({
+        title: 'Could not add prompts',
+        body: err?.message,
+        variant: 'info',
+      })
+    }finally{
+      setGenerating(false);
+    }
+  };
+
   const canStart = isFeud
     ? invitedIds.length > 0
     : selectedGame && (mode === 'solo' || (mode === 'multiplayer' && invitedIds.length > 0));
-  const isBusy = loading || feudLoading;
+  const isBusy = loading || feudLoading || tdLoading;
   const availableMembers = (members ?? []).filter((m) => m.id !== currentMember?.id);
   const resolvedDifficultyStepNumber = isFeud ? '4' : mode === 'multiplayer' ? '4' : '3';
 
@@ -190,10 +249,11 @@ export default function GamesHubScreen() {
           <Pressable
             onPress={() => {
               const isFeudSession = activeSession.game_type === 'family_feud';
-              const base = isFeudSession ? '/(stack)/games/feud' : '/(stack)/games';
+              const isTruthSession = activeSession.game_type === 'truth_dare';
+              const base = isFeudSession ? '/(stack)/games/feud' : isTruthSession ? '/(stack)/games/truth-dare' : '/(stack)/games';
               const route = activeSession.status === 'waiting'
-                  ? `${base}/${isFeudSession ? 'feud-lobby' : 'lobby'}?sessionId=${activeSession.id}`
-                  : `${base}/${isFeudSession ? 'feud-play' : 'play'}?sessionId=${activeSession.id}` 
+                  ? `${base}/${isFeudSession ? 'feud-lobby' : isTruthSession ? 'truth-dare-lobby' : 'lobby'}?sessionId=${activeSession.id}`
+                  : `${base}/${isFeudSession ? 'feud-play' : isTruthSession ? 'truth-dare-play' : 'play'}?sessionId=${activeSession.id}` 
               router.push(route as RelativePathString);
             }}
             style={({ pressed }) => [
@@ -226,7 +286,7 @@ export default function GamesHubScreen() {
           </View>
 
           <View className="gap-3">
-            {(Object.keys(GAME_META) as Array<keyof typeof GAME_META>).slice(0, 2).map((key) => {
+            {(Object.keys(GAME_META) as Array<keyof typeof GAME_META>).map((key) => {
               const meta = GAME_META[key];
               const selected = selectedGame === key;
               return (
@@ -273,7 +333,7 @@ export default function GamesHubScreen() {
         {selectedGame && (
           <View>
             {/* STEP 2: MODE — Family Feud is multiplayer-only, so this step is skipped for it */}
-            {!isFeud && (
+            {!isFeud && !isTd && (
               <View className="mb-6">
                 <View className="flex-row items-center mb-3 ml-1">
                   <View style={{ backgroundColor: colors.primary }} className="w-5 h-5 rounded-full items-center justify-center mr-2">
@@ -326,8 +386,131 @@ export default function GamesHubScreen() {
               </View>
             )}
 
+            {isTd && (
+              <>
+                {/* STEP 2 (Truth or Dare): GAME LENGTH */}
+                <View className="mb-6">
+                  <View className="flex-row items-center mb-3 ml-1">
+                    <View style={{ backgroundColor: colors.primary }} className="w-5 h-5 rounded-full items-center justify-center mr-2">
+                      <Text className="text-[10px] font-black text-white">2</Text>
+                    </View>
+                    <Text className="text-[10px] font-black text-muted uppercase tracking-widest">Game length</Text>
+                  </View>
+                  <View className="flex-row gap-2.5">
+                    {TURN_OPTIONS.map((o) => {
+                      const isSelected = maxTurns === o.value;
+                      return (
+                        <TouchableOpacity
+                          key={o.label}
+                          onPress={() => setMaxTurns(o.value)}
+                          style={[
+                            {
+                              backgroundColor: isSelected ? `${colors.primary}10` : colors.surface,
+                              borderColor: isSelected ? colors.primary : colors.border,
+                            },
+                          ]}
+                          className="flex-1 rounded-2xl border p-3 items-center"
+                        >
+                          <Text
+                            style={{ color: isSelected ? colors.primary : colors.foreground }}
+                            className="text-base font-black"
+                          >
+                            {o.value === null ? '∞' : o.value}
+                          </Text>
+                          <Text className="text-[9px] font-semibold text-muted">{o.value === null ? 'open' : 'turns'}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+            
+                {/* STEP 3 (Truth or Dare): VIBE */}
+                <View className="mb-6">
+                  <View className="flex-row items-center mb-3 ml-1">
+                    <View style={{ backgroundColor: colors.primary }} className="w-5 h-5 rounded-full items-center justify-center mr-2">
+                      <Text className="text-[10px] font-black text-white">3</Text>
+                    </View>
+                    <Text className="text-[10px] font-black text-muted uppercase tracking-widest">Vibe</Text>
+                  </View>
+                  <View className="flex-row gap-2.5">
+                    {([
+                      { key: 'mild', label: 'Gentle', desc: 'Wholesome and easy for everyone', icon: 'happy-outline', color: '#10B981' },
+                      { key: 'mixed', label: 'Mixed', desc: 'Adds funnier, slightly more embarrassing ones', icon: 'flame-outline', color: '#F59E0B' },
+                    ] as const).map((v) => {
+                      const isSelected = intensity === v.key;
+                      return (
+                        <TouchableOpacity
+                          key={v.key}
+                          onPress={() => setIntensity(v.key)}
+                          style={[
+                            {
+                              backgroundColor: isSelected ? `${v.color}10` : colors.surface,
+                              borderColor: isSelected ? v.color : colors.border,
+                            },
+                          ]}
+                          className="flex-1 rounded-2xl border p-3 items-center"
+                        >
+                          <View
+                            style={{ backgroundColor: `${v.color}${isSelected ? '25' : '15'}` }}
+                            className="w-9 h-9 rounded-xl items-center justify-center mb-2"
+                          >
+                            <Ionicons name={v.icon as any} size={18} color={v.color} />
+                          </View>
+                          <Text
+                            style={{ color: isSelected ? v.color : colors.foreground }}
+                            className="text-xs font-black mb-0.5"
+                          >
+                            {v.label}
+                          </Text>
+                          <Text className="text-[9px] font-semibold text-muted text-center">{v.desc}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+            
+                {/* FAMILY PROMPTS (premium admins only): unnumbered, like the invite step */}
+                {canGenerate && (
+                  <View className="mb-6">
+                    <View className="flex-row items-center mb-3 ml-1">
+                      <Ionicons name="sparkles-outline" size={14} color={colors.muted} />
+                      <Text className="ml-1.5 text-[10px] font-black text-muted uppercase tracking-widest">
+                        Family prompts
+                      </Text>
+                    </View>
+                    <TouchableOpacity
+                      onPress={onGenerate}
+                      disabled={generating}
+                      style={{
+                        backgroundColor: colors.surface,
+                        borderColor: colors.border,
+                        opacity: generating ? 0.6 : 1,
+                      }}
+                      className="flex-row items-center rounded-2xl border-2 p-4"
+                    >
+                      <View
+                        style={{ backgroundColor: `${colors.primary}15` }}
+                        className="mr-3 h-10 w-10 items-center justify-center rounded-xl"
+                      >
+                        {generating ? (
+                          <ActivityIndicator color={colors.primary} />
+                        ) : (
+                          <Ionicons name="sparkles" size={20} color={colors.primary} />
+                        )}
+                      </View>
+                      <View className="flex-1">
+                        <Text className="text-sm font-bold text-foreground">Add AI prompts</Text>
+                        <Text className="text-xs text-muted">10 new truths and dares made for your family</Text>
+                      </View>
+                      <Ionicons name="add-circle-outline" size={20} color={colors.primary} />
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </>
+            )}
+
             {/* STEP 2.5: INVITE — always shown for Feud, since it's multiplayer-only */}
-            {(mode === 'multiplayer' || isFeud) && (
+            {(mode === 'multiplayer' || isFeud || isTd) && (
               <View className="mb-6">
                 <View className="flex-row items-center justify-between mb-3 ml-1">
                   <View className="flex-row items-center">
@@ -471,7 +654,7 @@ export default function GamesHubScreen() {
             </View>}
 
             {/* STEP: DIFFICULTY — shown for trivia/quiz and for Feud */}
-            {!familyMode && <View className="mb-8">
+            {!familyMode && !isTd && <View className="mb-8">
               <View className="flex-row items-center mb-3 ml-1">
                 <View style={{ backgroundColor: colors.primary }} className="w-5 h-5 rounded-full items-center justify-center mr-2">
                   <Text className="text-[10px] font-black text-white">{resolvedDifficultyStepNumber}</Text>
@@ -548,6 +731,12 @@ export default function GamesHubScreen() {
               </View>
             )}
 
+            {tdError && (
+              <View className="mb-4 rounded-xl border border-error p-3">
+                <Text className="text-xs text-error">{tdError}</Text>
+              </View>
+            )}
+
             {/* START BUTTON */}
             <TouchableOpacity
               onPress={handleStart}
@@ -566,7 +755,7 @@ export default function GamesHubScreen() {
                 <>
                   <Ionicons name="rocket" size={18} color="#fff" />
                   <Text className="ml-2 text-base font-black text-white tracking-wide">
-                    {(isFeud || mode === 'multiplayer') && invitedIds.length === 0 ? 'Invite Someone First' : 'Start Game'}
+                    {(isFeud || isTd || mode === 'multiplayer') && invitedIds.length === 0 ? 'Invite Someone First' : 'Start Game'}
                   </Text>
                 </>
               )}
@@ -579,13 +768,21 @@ export default function GamesHubScreen() {
                 <Text className="ml-1 text-[10px] text-muted font-semibold">
                   {isFeud
                     ? `${feudRounds} rounds · ${DIFFICULTY_META[difficulty].label} · ${invitedIds.length + 1} players`
-                    : `10 questions · ${DIFFICULTY_META[difficulty].label} · ${mode === 'multiplayer' ? `${invitedIds.length + 1} players` : 'Solo play'}`}
+                    : isTd
+                      ? `${maxTurns === null ? 'Open-ended' : `${maxTurns} turns`} · ${intensity === 'mild' ? 'Gentle' : 'Mixed'} · ${invitedIds.length + 1} players`
+                      : `10 questions · ${DIFFICULTY_META[difficulty].label} · ${mode === 'multiplayer' ? `${invitedIds.length + 1} players` : 'Solo play'}`}
                 </Text>
               </View>
             )}
           </View>
         )}
       </ScrollView>
+
+      <UpgradePrompt
+        visible={upgradePromptVisible}
+        onClose={() => setUpgradePromptVisible(false)}
+        reason="ai_feature"
+        />
     </ScreenContainer>
   );
 }

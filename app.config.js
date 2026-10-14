@@ -24,6 +24,7 @@ module.exports = {
     bundleIdentifier: env.iosBundleId,
     infoPlist: {
       ITSAppUsesNonExemptEncryption: false,
+      LSApplicationQueriesSchemes: ['itms-apps'],
       NSCameraUsageDescription:
       "Fambound uses your camera to take photos for your family profile or to share photos with your family.",
       NSPhotoLibraryUsageDescription:
@@ -58,7 +59,15 @@ module.exports = {
   },
   plugins: [
     "expo-router",
-    // "expo-audio",
+    [
+      "expo-audio",
+      {
+        microphonePermission: false,
+        recordAudioAndroid: false,
+        enableBackgroundPlayback: false,
+        enableBackgroundRecording: false,
+      },
+    ],
     "expo-font",
     "expo-image",
     "expo-secure-store",

@@ -1,7 +1,7 @@
 import { serve } from 'https://deno.land/std@0.190.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { rejectIfNotFamilyMember } from '../_shared/family-auth.ts';
-import { normalizeAnswer, matchAnswer, getRoundMultiplier, type FeudAnswerRow } from '../_shared/feud-utils.ts';
+import { normalizeAnswer, matchAnswer, getRoundMultiplier, TURN_TIME_LIMIT_MS, type FeudAnswerRow } from '../_shared/feud-utils.ts';
 
 const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
 
@@ -14,7 +14,8 @@ type Action =
   | 'submit_face_off_answer'
   | 'choose_play_or_pass'
   | 'submit_turn_answer'
-  | 'submit_steal_answer';
+  | 'submit_steal_answer'
+  | 'submit_timeout';
 
 interface ActionRequest {
   session_id: string;
@@ -148,6 +149,7 @@ async function startRound(session: any, memberId: string) {
       current_player_id: null,
       steal_team_id: null,
       round_winner_team_id: null,
+      question_started_at: new Date().toISOString(),
       used_question_ids: [...(session.used_question_ids ?? []), questionId],
     })
     // Guards against a double-trigger race (e.g. two clients both react to
@@ -160,6 +162,52 @@ async function startRound(session: any, memberId: string) {
 
   if (error) throw error;
   return data ?? (await getSession(session.id)); // another caller won the race — return current state, not an error
+}
+
+async function resolveFaceOff(afterSubmit: any) {
+  const [idA, idB] = afterSubmit.face_off_player_ids;
+  const ansA = afterSubmit.face_off_answers?.[idA];
+  const ansB = afterSubmit.face_off_answers?.[idB];
+
+  // Only resolves once both players have an answer recorded — the first
+  // submitter (or a timeout that only filled one side) just waits/returns.
+  if (!ansA || !ansB) return afterSubmit;
+
+  if (ansA.points === ansB.points) {
+    // Tie (most commonly both 0, i.e. both unmatched) — burn this question
+    // and re-run the face-off with a fresh one, same two players.
+    const newQuestionId = await pickNextQuestion(afterSubmit);
+    const { data, error: tieErr } = await supabase
+      .from('game_session')
+      .update({
+        feud_question_id: newQuestionId,
+        face_off_answers: {},
+        question_started_at: new Date().toISOString(),
+        used_question_ids: [...(afterSubmit.used_question_ids ?? []), newQuestionId],
+      })
+      .eq('id', afterSubmit.id)
+      .select()
+      .single();
+    if (tieErr) throw tieErr;
+    return data;
+  }
+
+  const winnerId = ansA.points > ansB.points ? idA : idB;
+  const winnerTeam = await getMemberTeam(afterSubmit.id, winnerId);
+
+  const { data, error: resolveErr } = await supabase
+    .from('game_session')
+    .update({
+      feud_phase: 'play_or_pass',
+      controlling_team_id: winnerTeam,
+      current_player_id: winnerId, // face-off winner makes the play/pass call
+      question_started_at: new Date().toISOString(),
+    })
+    .eq('id', afterSubmit.id)
+    .select()
+    .single();
+  if (resolveErr) throw resolveErr;
+  return data;
 }
 
 async function submitFaceOffAnswer(session: any, memberId: string, answerText: string) {
@@ -185,47 +233,7 @@ async function submitFaceOffAnswer(session: any, memberId: string, answerText: s
     .single();
   if (error) throw error;
 
-  const [idA, idB] = afterSubmit.face_off_player_ids;
-  const ansA = afterSubmit.face_off_answers?.[idA];
-  const ansB = afterSubmit.face_off_answers?.[idB];
-
-  // Only the submission that completes the pair resolves the face-off —
-  // the first submitter just waits.
-  if (!ansA || !ansB) return afterSubmit;
-
-  if (ansA.points === ansB.points) {
-    // Tie (most commonly both 0, i.e. both unmatched) — burn this question
-    // and re-run the face-off with a fresh one, same two players.
-    const newQuestionId = await pickNextQuestion(afterSubmit);
-    const { data, error: tieErr } = await supabase
-      .from('game_session')
-      .update({
-        feud_question_id: newQuestionId,
-        face_off_answers: {},
-        used_question_ids: [...(afterSubmit.used_question_ids ?? []), newQuestionId],
-      })
-      .eq('id', session.id)
-      .select()
-      .single();
-    if (tieErr) throw tieErr;
-    return data;
-  }
-
-  const winnerId = ansA.points > ansB.points ? idA : idB;
-  const winnerTeam = await getMemberTeam(session.id, winnerId);
-
-  const { data, error: resolveErr } = await supabase
-    .from('game_session')
-    .update({
-      feud_phase: 'play_or_pass',
-      controlling_team_id: winnerTeam,
-      current_player_id: winnerId, // face-off winner makes the play/pass call
-    })
-    .eq('id', session.id)
-    .select()
-    .single();
-  if (resolveErr) throw resolveErr;
-  return data;
+  return resolveFaceOff(afterSubmit);
 }
 
 async function choosePlayOrPass(session: any, memberId: string, choice: 'play' | 'pass') {
@@ -255,6 +263,7 @@ async function choosePlayOrPass(session: any, memberId: string, choice: 'play' |
       feud_phase: 'playing',
       controlling_team_id: controllingTeam,
       current_player_id: startingPlayer,
+      question_started_at: new Date().toISOString(),
     })
     .eq('id', session.id)
     .eq('feud_phase', 'play_or_pass')
@@ -262,6 +271,49 @@ async function choosePlayOrPass(session: any, memberId: string, choice: 'play' |
     .maybeSingle();
   if (error) throw error;
   return data ?? (await getSession(session.id));
+}
+
+async function applyStrike(session: any, actingMemberId: string) {
+  const strikes = session.strikes + 1;
+  if (strikes >= 3) {
+    const stealTeam = otherTeam(session.controlling_team_id);
+    let stealRep = session.face_off_player_ids[0];
+    for (const id of session.face_off_player_ids) {
+      const t = await getMemberTeam(session.id, id);
+      if (t === stealTeam) {
+        stealRep = id;
+        break;
+      }
+    }
+    const { data, error } = await supabase
+      .from('game_session')
+      .update({
+        strikes,
+        feud_phase: 'steal',
+        steal_team_id: stealTeam,
+        current_player_id: stealRep,
+        question_started_at: new Date().toISOString(),
+      })
+      .eq('id', session.id)
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  }
+
+  const roster = await getTeamRoster(session.id, session.controlling_team_id);
+  const { data, error } = await supabase
+    .from('game_session')
+    .update({
+      strikes,
+      current_player_id: nextInRoster(roster, actingMemberId),
+      question_started_at: new Date().toISOString(),
+    })
+    .eq('id', session.id)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
 }
 
 async function submitTurnAnswer(session: any, memberId: string, answerText: string) {
@@ -276,43 +328,14 @@ async function submitTurnAnswer(session: any, memberId: string, answerText: stri
   const roster = await getTeamRoster(session.id, session.controlling_team_id);
 
   // No match anywhere in the answer bank — wrong answer, strike.
-  if (!match) {
-    const strikes = session.strikes + 1;
-    if (strikes >= 3) {
-      const stealTeam = otherTeam(session.controlling_team_id);
-      let stealRep = session.face_off_player_ids[0];
-      for (const id of session.face_off_player_ids) {
-        const t = await getMemberTeam(session.id, id);
-        if (t === stealTeam) {
-          stealRep = id;
-          break;
-        }
-      }
-      const { data, error } = await supabase
-        .from('game_session')
-        .update({ strikes, feud_phase: 'steal', steal_team_id: stealTeam, current_player_id: stealRep })
-        .eq('id', session.id)
-        .select()
-        .single();
-      if (error) throw error;
-      return data;
-    }
-    const { data, error } = await supabase
-      .from('game_session')
-      .update({ strikes, current_player_id: nextInRoster(roster, memberId) })
-      .eq('id', session.id)
-      .select()
-      .single();
-    if (error) throw error;
-    return data;
-  }
+  if (!match) return applyStrike(session, memberId);
 
   // Matched, but already revealed — duplicate. Consume the turn, no strike,
   // no points (spec section 13).
   if (revealedIds.includes(match.id)) {
     const { data, error } = await supabase
       .from('game_session')
-      .update({ current_player_id: nextInRoster(roster, memberId) })
+      .update({ current_player_id: nextInRoster(roster, memberId), question_started_at: new Date().toISOString() })
       .eq('id', session.id)
       .select()
       .single();
@@ -347,6 +370,7 @@ async function submitTurnAnswer(session: any, memberId: string, answerText: stri
       revealed_answer_ids: newRevealed,
       round_points: newRoundPoints,
       current_player_id: nextInRoster(roster, memberId),
+      question_started_at: new Date().toISOString(),
     })
     .eq('id', session.id)
     .select()
@@ -427,6 +451,57 @@ async function shuffleTeams(session: any, memberId: string) {
   return session;
 }
 
+// Any participant can call this — not just the player being timed out —
+// since the whole point is anti-stalling. Safe because the server verifies
+// the elapsed time itself rather than trusting the caller's clock.
+async function handleTimeout(session: any, memberId: string) {
+  const timedPhases = ['face_off', 'play_or_pass', 'playing', 'steal'];
+  if (!timedPhases.includes(session.feud_phase)) throw new Error('Nothing to time out right now');
+  if (!session.question_started_at) throw new Error('No active timer for this phase');
+
+  const elapsed = Date.now() - new Date(session.question_started_at).getTime();
+  // Small grace period so a client whose clock runs a touch fast can't
+  // force a timeout before it has genuinely elapsed server-side.
+  if (elapsed < TURN_TIME_LIMIT_MS - 1000) throw new Error('Time has not run out yet');
+
+  if (session.feud_phase === 'face_off') {
+    const missing = (session.face_off_player_ids ?? []).filter((id: string) => !session.face_off_answers?.[id]);
+    if (!missing.length) throw new Error('Face-off already complete');
+    const filledAnswers = { ...session.face_off_answers };
+    for (const id of missing) filledAnswers[id] = { text: '', matched_answer_id: null, points: 0 };
+
+    const { data: afterFill, error } = await supabase
+      .from('game_session')
+      .update({ face_off_answers: filledAnswers })
+      .eq('id', session.id)
+      .select()
+      .single();
+    if (error) throw error;
+    return resolveFaceOff(afterFill);
+  }
+
+  if (session.feud_phase === 'play_or_pass') {
+    // Default to Play rather than let the game stall.
+    return choosePlayOrPass(session, session.current_player_id, 'play');
+  }
+
+  if (session.feud_phase === 'playing') {
+    return applyStrike(session, session.current_player_id);
+  }
+
+  // steal — an unanswered steal counts as a miss, same as a wrong guess.
+  const teamScores = { ...session.team_scores };
+  teamScores[session.controlling_team_id] = (teamScores[session.controlling_team_id] ?? 0) + session.round_points;
+  const updates = finalizeIfGameOver(session, {
+    team_scores: teamScores,
+    feud_phase: 'round_complete',
+    round_winner_team_id: session.controlling_team_id,
+  });
+  const { data, error } = await supabase.from('game_session').update(updates).eq('id', session.id).select().single();
+  if (error) throw error;
+  return data;
+}
+
 // ── Dispatch ────────────────────────────────────────────────────
 
 serve(async (req) => {
@@ -472,6 +547,9 @@ serve(async (req) => {
         break;
       case 'submit_steal_answer':
         result = await submitStealAnswer(session, member_id, body.answer_text ?? '');
+        break;
+      case 'submit_timeout':
+        result = await handleTimeout(session, member_id);
         break;
       default:
         return json({ error: 'Unknown action' }, 400);
